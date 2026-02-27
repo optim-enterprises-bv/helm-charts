@@ -1,0 +1,80 @@
+{{- if .Values.networkPolicy.enabled }}
+# ── ac-server NetworkPolicy ───────────────────────────────────────────────────
+# Ingress: ACP protocol port from any source (access points are external).
+# Egress: MySQL only, plus DNS and optional Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ac-server.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ac-server.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: {{ .Values.config.serverPort }}
+          protocol: TCP
+    {{- if .Values.metrics.enabled }}
+    - ports:
+        - port: {{ .Values.metrics.port }}
+          protocol: TCP
+    {{- end }}
+  egress:
+    - ports:
+        - port: 3306
+          protocol: TCP
+    {{- if .Values.redis.enabled }}
+    - ports:
+        - port: 6379
+          protocol: TCP
+    {{- end }}
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+{{- if .Values.ui.enabled }}
+# ── optimacs-ui NetworkPolicy ─────────────────────────────────────────────────
+# Ingress: HTTP from cluster (Ingress controller or internal calls).
+# Egress: MySQL only, plus DNS and optional Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "optimacs.ui.fullname" . }}
+  labels:
+    {{- include "optimacs.ui.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "optimacs.ui.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: {{ .Values.ui.service.port }}
+          protocol: TCP
+  egress:
+    - ports:
+        - port: 3306
+          protocol: TCP
+    {{- if .Values.redis.enabled }}
+    - ports:
+        - port: 6379
+          protocol: TCP
+    {{- end }}
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}
+{{- end }}

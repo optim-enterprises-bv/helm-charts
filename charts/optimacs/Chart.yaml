@@ -1,0 +1,53 @@
+apiVersion: v2
+name: optimacs
+description: |
+  Full OptimACS stack — USP Controller (TR-369/ac-server), management web UI
+  (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster, and
+  Smallstep step-ca PKI for certificate lifecycle management.
+type: application
+version: 0.4.0
+appVersion: "0.4.0"
+keywords:
+  - usp
+  - tr-369
+  - acp
+  - access-point
+  - iot
+  - tls
+  - post-quantum
+  - mqtt
+  - pki
+  - certificate-authority
+maintainers:
+  - name: optim-enterprises-bv
+
+dependencies:
+  # Bitnami MySQL — deployed as a primary/replica cluster.
+  # Run `helm dependency update ./helm/ac-server` to fetch the chart archive.
+  - name: mysql
+    version: "11.1.10"
+    repository: https://charts.bitnami.com/bitnami
+    condition: mysql.enabled
+
+  # Bitnami Redis — optional config-proto cache and rate-limit store.
+  # Set redis.enabled=true to deploy; or point redis.url at an external instance.
+  - name: redis
+    version: ">=20.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+
+  # EMQX — MQTT broker for the USP MQTT MTP (TR-369).
+  # Set emqx.enabled=false and configure usp.mqtt.url to use an external broker.
+  - name: emqx
+    version: ">=5.0.0"
+    repository: https://repos.emqx.io/charts
+    condition: emqx.enabled
+
+  # Smallstep step-ca — PKI / certificate authority for device cert lifecycle.
+  # Set stepca.enabled=true to deploy an in-cluster CA.
+  # Or point stepca.url at an external step-ca instance (stepca.enabled=false).
+  # Full chart reference: https://github.com/smallstep/helm-charts
+  - name: step-certificates
+    version: ">=1.0.0"
+    repository: https://smallstep.github.io/helm-charts
+    condition: stepca.enabled

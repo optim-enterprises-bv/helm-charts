@@ -1,0 +1,174 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ac-server.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ac-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll pods when the config Secret changes
+        checksum/config: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "ac-server.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Write the config to /tmp (the only writable path when
+      # readOnlyRootFilesystem is true) before the main container starts.
+      initContainers:
+        - name: init-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["cp", "/etc/ac-server/config/ac_server.conf", "/tmp/ac_server.conf"]
+          volumeMounts:
+            - name: config-secret
+              mountPath: /etc/ac-server/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      containers:
+        - name: ac-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["ac-server", "-f", "/tmp/ac_server.conf"]
+          ports:
+            - name: acp
+              containerPort: {{ .Values.config.serverPort }}
+              protocol: TCP
+            {{- if gt (.Values.usp.ws.port | int) 0 }}
+            - name: usp-ws
+              containerPort: {{ .Values.usp.ws.port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
+
+          # Liveness: the process must still be running
+          livenessProbe:
+            tcpSocket:
+              port: acp
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness: the port must be accepting connections
+          readinessProbe:
+            tcpSocket:
+              port: acp
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          volumeMounts:
+            # Rendered config (written by init container)
+            - name: tmp
+              mountPath: /tmp
+
+            # TLS certificates and CA key
+            - name: tls-certs
+              mountPath: /etc/ac-server/tls
+              readOnly: true
+
+            # Persistent data volumes
+            - name: client-dir
+              mountPath: /var/ac-server/peers
+            - name: fw-dir
+              mountPath: /var/ac-server/firmware
+            - name: img-dir
+              mountPath: /var/ac-server/images
+
+            {{- $stepcaUrl := .Values.stepca.url }}
+            {{- if and .Values.stepca.enabled (not $stepcaUrl) }}
+            {{-   $stepcaUrl = printf "https://%s-step-certificates:9000" (include "ac-server.fullname" .) }}
+            {{- end }}
+            {{- if $stepcaUrl }}
+            # step-ca JWK provisioner private key
+            - name: stepca-provisioner
+              mountPath: /etc/ac-server/stepca
+              readOnly: true
+            {{- end }}
+
+      volumes:
+        - name: config-secret
+          secret:
+            secretName: {{ include "ac-server.configSecretName" . }}
+
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.tlsSecret.name }}
+
+        - name: tmp
+          emptyDir: {}
+
+        {{- $stepcaUrl2 := .Values.stepca.url }}
+        {{- if and .Values.stepca.enabled (not $stepcaUrl2) }}
+        {{-   $stepcaUrl2 = printf "https://%s-step-certificates:9000" (include "ac-server.fullname" .) }}
+        {{- end }}
+        {{- if $stepcaUrl2 }}
+        - name: stepca-provisioner
+          secret:
+            secretName: {{ include "ac-server.fullname" . }}-stepca-provisioner
+        {{- end }}
+
+        - name: client-dir
+          persistentVolumeClaim:
+            claimName: {{ include "ac-server.clientDirPvcName" . }}
+
+        - name: fw-dir
+          persistentVolumeClaim:
+            claimName: {{ include "ac-server.fwDirPvcName" . }}
+
+        - name: img-dir
+          persistentVolumeClaim:
+            claimName: {{ include "ac-server.imgDirPvcName" . }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if gt (int .Values.replicaCount) 1 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "ac-server.selectorLabels" . | nindent 20 }}
+                topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

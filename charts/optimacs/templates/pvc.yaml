@@ -1,0 +1,63 @@
+{{/*
+Client certificate / config-cache directory (xml_dir).
+Always provisioned by this chart.
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ac-server.clientDirPvcName" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.clientDir.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.clientDir.size | quote }}
+  {{- if .Values.persistence.clientDir.storageClass }}
+  storageClassName: {{ .Values.persistence.clientDir.storageClass | quote }}
+  {{- end }}
+---
+{{/*
+Firmware directory (fw_dir).
+Skipped when persistence.fwDir.existingClaim is set.
+*/}}
+{{- if not .Values.persistence.fwDir.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ac-server.fullname" . }}-fw-dir
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.fwDir.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.fwDir.size | quote }}
+  {{- if .Values.persistence.fwDir.storageClass }}
+  storageClassName: {{ .Values.persistence.fwDir.storageClass | quote }}
+  {{- end }}
+{{- end }}
+---
+{{/*
+Camera images directory (img_dir).
+Skipped when persistence.imgDir.existingClaim is set.
+*/}}
+{{- if not .Values.persistence.imgDir.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ac-server.fullname" . }}-img-dir
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.imgDir.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.imgDir.size | quote }}
+  {{- if .Values.persistence.imgDir.storageClass }}
+  storageClassName: {{ .Values.persistence.imgDir.storageClass | quote }}
+  {{- end }}
+{{- end }}

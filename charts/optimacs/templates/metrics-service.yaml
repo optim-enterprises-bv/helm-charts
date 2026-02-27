@@ -1,0 +1,42 @@
+{{- if .Values.metrics.enabled }}
+# Dedicated ClusterIP service for Prometheus scraping of ac-server metrics.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ac-server.fullname" . }}-metrics
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    {{- include "ac-server.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: {{ .Values.metrics.port }}
+      targetPort: {{ .Values.metrics.port }}
+---
+{{- if .Values.metrics.serviceMonitor.enabled }}
+# ServiceMonitor for the Prometheus Operator.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "ac-server.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+  {{- with .Values.metrics.serviceMonitor.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "ac-server.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: metrics
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      path: /metrics
+{{- end }}
+{{- end }}

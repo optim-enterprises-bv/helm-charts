@@ -1,0 +1,86 @@
+APConfig has been deployed.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Prerequisites (must exist before helm install)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. TLS Secret ({{ .Values.tlsSecret.name }}):
+
+   kubectl create secret generic {{ .Values.tlsSecret.name }} \
+     --from-file=server.crt=/path/to/server.crt  \
+     --from-file=server.key=/path/to/server.key  \
+     --from-file=rootCA.crt=/path/to/rootCA.crt  \
+     --from-file=rootCA.key=/path/to/rootCA.key  \
+     --namespace {{ .Release.Namespace }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ MySQL cluster
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.mysql.enabled }}
+
+Architecture : {{ .Values.mysql.architecture }}
+Primary host : {{ include "apconfig.mysql.host" . }}.{{ .Release.Namespace }}.svc.cluster.local:3306
+Database     : {{ include "apconfig.mysql.database" . }}
+User         : {{ include "apconfig.mysql.user" . }}
+
+The schema is created automatically via initdbScripts on first boot.
+Wait for the primary pod to be Ready before the ac-server and UI pods
+will pass their readiness probes:
+
+  kubectl get pods -l app.kubernetes.io/name=mysql \
+    --namespace {{ .Release.Namespace }} --watch
+
+Create the first admin user (run once after the UI pod is Ready):
+
+  kubectl exec -n {{ .Release.Namespace }} \
+    $(kubectl get pod -n {{ .Release.Namespace }} -l "{{ include "apconfig.ui.selectorLabels" . }}" -o name | head -1) \
+    -- python create_admin.py --username admin \
+                              --password <choose-a-password> \
+                              --role full_admin
+{{- else }}
+  mysql.enabled=false — connecting to external host: {{ .Values.config.dbHost }}
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Connect to the ACP server
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if eq .Values.service.type "LoadBalancer" }}
+  Wait for an external IP:
+    kubectl get svc {{ include "ac-server.fullname" . }} \
+      --namespace {{ .Release.Namespace }} --watch
+
+  Access Point devices should connect to:
+    <EXTERNAL-IP>:{{ .Values.service.port }}
+{{- else if eq .Values.service.type "NodePort" }}
+  Access Point devices should connect to any node IP on port:
+    {{ .Values.service.nodePort | default "see `kubectl get svc`" }}
+{{- else }}
+  Service type is {{ .Values.service.type }}. Expose port {{ .Values.service.port }} as needed.
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Web UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.ui.enabled }}
+{{- if .Values.ui.ingress.enabled }}
+  Management UI:  http{{ if .Values.ui.ingress.tls }}s{{ end }}://{{ .Values.ui.ingress.hostname }}
+{{- else }}
+  Port-forward to access the UI locally:
+    kubectl port-forward svc/{{ include "apconfig.ui.fullname" . }} 8080:{{ .Values.ui.service.port }} \
+      --namespace {{ .Release.Namespace }}
+
+  Then open: http://localhost:8080
+{{- end }}
+
+  GraphQL playground: <ui-url>/graphql
+{{- else }}
+  ui.enabled=false — web UI not deployed.
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Security notes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• TLS 1.3 only — hybrid X25519+ML-KEM-768 key exchange (NIST FIPS 203).
+• DB password stored in a Kubernetes Secret, not a ConfigMap.
+• Containers run as non-root (UID 1000).
+• ac-server has a read-only root filesystem.

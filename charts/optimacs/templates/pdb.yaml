@@ -1,0 +1,32 @@
+{{/*
+PodDisruptionBudgets — automatically created when replicaCount > 1.
+Ensures at least one pod stays available during voluntary disruptions
+(node drains, rolling updates, cluster upgrades).
+*/}}
+{{- if gt (int .Values.replicaCount) 1 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ac-server.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "ac-server.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- if and .Values.ui.enabled (gt (int .Values.ui.replicaCount) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "optimacs.ui.fullname" . }}
+  labels:
+    {{- include "optimacs.ui.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "optimacs.ui.selectorLabels" . | nindent 6 }}
+{{- end }}

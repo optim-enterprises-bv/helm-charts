@@ -1,0 +1,15 @@
+dependencies:
+- name: mysql
+  repository: https://charts.bitnami.com/bitnami
+  version: 11.1.10
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 25.3.2
+- name: emqx
+  repository: https://repos.emqx.io/charts
+  version: 5.8.9
+- name: step-certificates
+  repository: https://smallstep.github.io/helm-charts
+  version: 1.29.0
+digest: sha256:ec4625b8cd46b4d9acfa6c6d065910bdef7fc662f19bcbe5fd7b3e6f7719572f
+generated: "2026-02-27T16:42:05.899694+07:00"

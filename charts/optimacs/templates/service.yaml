@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ac-server.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "ac-server.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: acp
+      protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: acp
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
+    {{- if gt (.Values.usp.ws.port | int) 0 }}
+    - name: usp-ws
+      protocol: TCP
+      port: {{ .Values.usp.ws.port }}
+      targetPort: usp-ws
+    {{- end }}

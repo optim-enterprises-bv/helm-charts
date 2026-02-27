@@ -1,0 +1,715 @@
+# Default values for the optimacs full-stack chart.
+# Override specific sections with --set or -f <file>.yaml at install time.
+
+# ── ac-server ─────────────────────────────────────────────────────────────────
+
+image:
+  repository: ghcr.io/optim-enterprises-bv/ac-server
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ── Server configuration ──────────────────────────────────────────────────────
+
+config:
+  serverHost: "0.0.0.0"
+  serverPort: 3490
+
+  # CN used by unregistered devices during the initial INIT handshake
+  initCn: "00:00:00:00:00:00"
+
+  # Database schema: "generic" or "meshconnect"
+  dbSchema: generic
+
+  # Override dbHost only when mysql.enabled=false (external DB).
+  # When mysql.enabled=true the primary service hostname is used automatically.
+  dbHost: mysql
+  dbUser: acserver
+  dbName: laravel
+
+# ── Shared DB credentials ─────────────────────────────────────────────────────
+# Used by ac-server, the web UI, and passed to bitnami/mysql as mysql.auth.password.
+# Required — override with: --set db.password=<value>
+
+db:
+  password: ""
+
+# Name of an existing Secret holding the server TLS PEM files for ac-server.
+# Create before helm install:
+#   kubectl create secret generic ac-server-tls \
+#     --from-file=server.crt=/path/to/server.crt \
+#     --from-file=server.key=/path/to/server.key \
+#     --from-file=rootCA.crt=/path/to/rootCA.crt \
+#     --namespace <release-namespace>
+tlsSecret:
+  name: ac-server-tls
+
+# ── Persistent storage (ac-server) ────────────────────────────────────────────
+
+persistence:
+  # NOTE: ReadWriteMany requires a storage class that supports concurrent
+  # access from multiple nodes (e.g. NFS, AWS EFS, Azure Files, GCP
+  # Filestore).  Set storageClass to an appropriate RWX provisioner.
+  # For single-replica deployments ReadWriteOnce also works; override with
+  #   --set persistence.clientDir.accessMode=ReadWriteOnce
+  clientDir:
+    size: 1Gi
+    storageClass: ""
+    accessMode: ReadWriteMany
+
+  fwDir:
+    size: 10Gi
+    storageClass: ""
+    accessMode: ReadWriteMany
+    existingClaim: ""
+
+  imgDir:
+    size: 50Gi
+    storageClass: ""
+    accessMode: ReadWriteMany
+    existingClaim: ""
+
+# ── Kubernetes service (ac-server) ────────────────────────────────────────────
+
+service:
+  type: LoadBalancer
+  port: 3490
+  # nodePort: 30490
+  annotations: {}
+
+# ── Pod settings (ac-server) ──────────────────────────────────────────────────
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podAnnotations: {}
+podSecurityContext: {}
+
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+imagePullSecrets: []
+
+# ── Web UI ────────────────────────────────────────────────────────────────────
+
+ui:
+  enabled: true
+
+  image:
+    repository: ghcr.io/optim-enterprises-bv/optimacs-ui
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Starlette session signing key — required when ui.enabled=true.
+  # Override with: --set ui.secretKey=$(openssl rand -hex 32)
+  secretKey: ""
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hostname: optimacs.example.com
+    tls: []
+    # tls:
+    #   - secretName: optimacs-tls
+    #     hosts:
+    #       - optimacs.example.com
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # readOnlyRootFilesystem=false: uvicorn writes __pycache__ on startup
+  securityContext:
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ── Horizontal Pod Autoscaler ─────────────────────────────────────────────────
+# When enabled, the HPA manages replica counts; set replicaCount / ui.replicaCount
+# to the desired minimum (the HPA minReplicas takes precedence at runtime).
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+  ui:
+    minReplicas: 2
+    maxReplicas: 5
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+# Restricts east-west traffic so each service can only reach MySQL (and
+# optionally Redis).  Enable only after verifying your CNI supports NetworkPolicy.
+
+networkPolicy:
+  enabled: false
+
+# ── Redis cache ───────────────────────────────────────────────────────────────
+# When enabled, ac-server caches generate_conf_proto() results in Redis,
+# eliminating the 8-query DB round trip on every GET_CONFIG / CHECK_UPDATE.
+#
+# Option A — embedded (bitnami/redis sub-chart):
+#   helm install optimacs ./helm/ac-server --set redis.enabled=true
+#
+# Option B — external Redis:
+#   --set redis.url="redis://:password@my-redis:6379/0"
+
+redis:
+  # REQUIRED for horizontal scaling (replicaCount > 1).
+  # When enabled, ac-server uses Redis as a shared endpoint registry so that
+  # agent MAC addresses are visible across all replicas.
+  # Enable with: --set redis.enabled=true
+  enabled: false
+  # External Redis URL (used when redis.enabled=false).
+  url: ""
+  # TTL in seconds for cached config protobuf payloads.
+  cacheTtl: 300
+  # Bitnami sub-chart settings (used only when redis.enabled=true).
+  architecture: standalone
+  auth:
+    enabled: false
+
+# ── USP / TR-369 ──────────────────────────────────────────────────────────────
+# ac-server acts as a USP Controller.  Agents (ac-client on APs) connect via
+# WebSocket MTP (direct WSS) and/or MQTT MTP (via EMQX broker).
+
+usp:
+  # USP Controller endpoint ID
+  endpointId: "oui:00005A:OptimACS-Controller-1"
+  # MQTT client ID
+  mqttClientId: "OptimACS-Controller-1"
+  ws:
+    # WebSocket MTP listen port (0 = disabled)
+    port: 3491
+  mqtt:
+    # MQTT broker URL.  Leave empty to auto-set to emqx service when emqx.enabled=true.
+    url: ""
+
+# ── EMQX MQTT Broker ──────────────────────────────────────────────────────────
+# When emqx.enabled=true, EMQX is deployed as a dependency sub-chart.
+# The ac-server MQTT_URL is automatically configured to point at the EMQX service.
+# Full EMQX chart parameters: https://github.com/emqx/emqx/tree/main/deploy/charts/emqx
+
+emqx:
+  enabled: true
+  # For HA, set replicaCount to 3 (minimum for EMQX clustering).
+  # Shared subscriptions ($share/ac-server/…) require at least one EMQX node.
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    mqtt:    1883
+    mqtts:   8883
+    ws:      8083
+    wss:     8084
+    dashboard: 18083
+  persistence:
+    enabled: true
+    size: 1Gi
+  # EMQX cluster cookie — override in production
+  emqxConfig:
+    EMQX_NODE__COOKIE: "emqx_cookie_change_me"
+
+# ── step-ca PKI ───────────────────────────────────────────────────────────────
+# Smallstep step-ca is an open-source CA that manages the full certificate
+# lifecycle for OptimACS: device client certs, server cert, and init cert.
+# The CA private key never touches ac-server pods.
+#
+# Option A — in-cluster CA (step-certificates sub-chart):
+#   helm install optimacs ./helm/ac-server \
+#     --set stepca.enabled=true \
+#     --set stepca.kid=<provisioner-kid> \
+#     --set stepca.provisionerPassword=<password>
+#
+# Option B — external step-ca with K8s Secret (recommended for production):
+#   # Create the provisioner key secret first — see README §10 (PKI Setup):
+#   kubectl create secret generic ac-server-stepca-provisioner \
+#     --from-file=provisioner.key=/path/to/provisioner.key \
+#     --namespace <release-namespace>
+#   # Then install:
+#   helm install optimacs ./helm/ac-server \
+#     --set stepca.enabled=false \
+#     --set stepca.url=https://my-step-ca:9000 \
+#     --set stepca.kid=<provisioner-kid> \
+#     --set stepca.fingerprint=<root-ca-sha256>
+#
+# Option C — external step-ca with inline key (CI/CD or testing):
+#   --set-file stepca.keyPem=/path/to/provisioner.key
+#
+# When stepca.url is non-empty, ac-server delegates all cert signing to step-ca.
+
+stepca:
+  # Set true to deploy an in-cluster step-ca via the step-certificates sub-chart.
+  enabled: false
+
+  # Base URL of the step-ca API server.
+  # Auto-set to the in-cluster service URL when stepca.enabled=true.
+  # Override with an external URL when stepca.enabled=false.
+  url: ""
+
+  # SHA-256 fingerprint of step-ca's root CA certificate (hex, no colons).
+  # Used to bootstrap `ca_file` on first startup.
+  # Obtain with: step ca fingerprint
+  fingerprint: ""
+
+  # JWK provisioner key ID (the "kid" field from `step ca provisioner list`).
+  kid: ""
+
+  # EC P-256 private key PEM for the JWK provisioner (Option C — inline key).
+  # Used to sign one-time tokens (OTTs) for cert signing requests.
+  # For production prefer provisioner.secretName (Option B) over this field.
+  # Mount path inside ac-server: /etc/ac-server/stepca/provisioner.key
+  keyPem: ""
+
+  # Name of an existing K8s Secret holding the JWK provisioner private key PEM
+  # (Option B).  The Secret must have a key named "provisioner.key".
+  # Create with: kubectl create secret generic ac-server-stepca-provisioner \
+  #   --from-file=provisioner.key=/path/to/provisioner.key \
+  #   --namespace <release-namespace>
+  # Ignored when keyPem is set.
+  provisioner:
+    secretName: ac-server-stepca-provisioner
+
+  # Password to decrypt the step-ca provisioner JWK (required by step-certificates
+  # sub-chart; not used by ac-server directly).
+  provisionerPassword: ""
+
+  # Skip TLS certificate verification for step-ca's HTTPS endpoint.
+  # Set true only in development environments with self-signed step-ca certs.
+  skipVerify: false
+
+  # step-certificates sub-chart overrides (used only when stepca.enabled=true).
+  # Full parameter reference:
+  #   https://github.com/smallstep/helm-charts/tree/main/charts/step-certificates
+  "step-certificates":
+    # CA name shown in certificates
+    ca:
+      name: "OptimACS CA"
+      # DNS SANs for the step-ca server certificate
+      dns: ""
+      # Address the step-ca server listens on
+      address: ":9000"
+      # Provisioner type: JWK (JSON Web Key — used by ac-server for API signing)
+      provisioner:
+        name: "ac-server"
+    # Persistence for the step-ca CA data directory
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# ── Prometheus metrics ────────────────────────────────────────────────────────
+# ac-server exposes a /metrics endpoint on a dedicated port when enabled.
+# Pair with metrics.serviceMonitor.enabled=true for the Prometheus Operator.
+
+metrics:
+  enabled: false
+  port: 9090
+  serviceMonitor:
+    enabled: false
+    interval: "30s"
+    namespace: ""
+
+# ── MySQL (bitnami/mysql sub-chart) ───────────────────────────────────────────
+# Full parameter reference:
+#   https://github.com/bitnami/charts/tree/main/bitnami/mysql#parameters
+#
+# Set mysql.enabled=false and configure config.dbHost / db.password manually
+# to connect to an external MySQL instance.
+
+mysql:
+  enabled: true
+
+  # "replication" = primary StatefulSet + secondary StatefulSet (HA).
+  # "standalone"  = single node (dev / resource-constrained environments).
+  architecture: replication
+
+  auth:
+    # Root password for administrative operations.  Required.
+    rootPassword: ""
+    # Application database / user — must match config.dbName / config.dbUser.
+    database: laravel
+    username: acserver
+    # Rendered from db.password at deploy time via _helpers.tpl.
+    # Do NOT set this separately; use --set db.password=<value> instead.
+    password: ""
+
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+    configuration: |-
+      [mysqld]
+      default_authentication_plugin=mysql_native_password
+      skip-name-resolve
+      explicit_defaults_for_timestamp
+      basedir=/opt/bitnami/mysql
+      plugin_dir=/opt/bitnami/mysql/lib/plugin
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      datadir=/bitnami/mysql/data
+      tmpdir=/opt/bitnami/mysql/tmp
+      max_allowed_packet=16M
+      bind-address=*
+      pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+      log-error=/opt/bitnami/mysql/logs/mysqld.log
+      character-set-server=utf8mb4
+      collation-server=utf8mb4_general_ci
+      innodb_buffer_pool_size=256M
+      max_connections=200
+
+      [client]
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      default-character-set=utf8mb4
+
+      [manager]
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+
+  secondary:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 20Gi
+
+  # SQL executed on the primary on first boot — creates all OptimACS tables.
+  initdbScripts:
+    01_optimacs_schema.sql: |
+      SET NAMES UTF8;
+
+      -- ── Admin accounts ────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `admins` (
+        `id`       int(11)      NOT NULL AUTO_INCREMENT,
+        `username` varchar(32)  NOT NULL,
+        `password` varchar(128) NOT NULL,
+        `email`    varchar(128) NOT NULL DEFAULT '',
+        `role`     enum('full_admin','ap_admin','stats_viewer') NOT NULL DEFAULT 'ap_admin',
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── DB revision log ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `db_revision` (
+        `id`       int(11)      NOT NULL AUTO_INCREMENT,
+        `time`     DATETIME     NOT NULL,
+        `revision` varchar(32)  NOT NULL,
+        `file`     varchar(256) NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Unprovisioned devices ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `new_systems` (
+        `id`    int(11)     NOT NULL AUTO_INCREMENT,
+        `ip`    varchar(32) NOT NULL,
+        `mac`   varchar(32) NOT NULL,
+        `arch`  varchar(32) NOT NULL,
+        `added` DATETIME    NOT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_new_systems_mac` (`mac`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Blocked devices ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `blocked_systems` (
+        `id`     int(11)       NOT NULL AUTO_INCREMENT,
+        `ip`     varchar(32)   NOT NULL,
+        `mac`    varchar(32)   NOT NULL,
+        `arch`   varchar(32)   NOT NULL,
+        `added`  DATETIME      NOT NULL,
+        `reason` varchar(1024) NOT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_blocked_systems_mac` (`mac`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Firmware images ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `firmware` (
+        `id`      int(11)      NOT NULL AUTO_INCREMENT,
+        `fw_name` varchar(512) NOT NULL,
+        `fw_size` varchar(64)  NOT NULL,
+        `fw_csum` varchar(64)  NOT NULL,
+        `fw_ver`  varchar(64)  NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Provisioned systems ───────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `systems` (
+        `id`        int(11)      NOT NULL AUTO_INCREMENT,
+        `hostname`  varchar(256) NOT NULL,
+        `ip`        varchar(32)  NOT NULL,
+        `mac`       varchar(32)  NOT NULL,
+        `arch`      varchar(32)  NOT NULL,
+        `password`  varchar(64)  NOT NULL,
+        `version`   varchar(64)  DEFAULT NULL,
+        `fw_id`     int(11)      NOT NULL,
+        `ca_file`   text         NOT NULL,
+        `cert_file` text         NOT NULL,
+        `key_file`  text         NOT NULL,
+        `key_pass`  varchar(64)  DEFAULT NULL,
+        `last_seen` DATETIME     NOT NULL,
+        `active`    tinyint(1)   NOT NULL DEFAULT '1',
+        PRIMARY KEY (`id`),
+        -- Covering index for the most common lookup pattern:
+        --   WHERE mac = ? AND active = 1
+        -- Used by every USP DM query, heartbeat update, and MAC validation.
+        INDEX `idx_systems_mac_active` (`mac`, `active`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Access networks ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `access_networks` (
+        `id`      int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`  int(11)     NOT NULL,
+        `network` varchar(64) NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Wi-Fi devices ─────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `wifi_devices` (
+        `id`        int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`    int(11)     NOT NULL,
+        `name`      varchar(32) NOT NULL,
+        `type`      varchar(32) NOT NULL,
+        `channel`   int(8)      NOT NULL,
+        `distance`  int(8)      DEFAULT NULL,
+        `antenna`   enum('left','right','both','verticle') DEFAULT NULL,
+        `diversity` int(8)      DEFAULT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Network interfaces ────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `interfaces` (
+        `id`           int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`       int(11)     NOT NULL,
+        `name`         varchar(8)  NOT NULL,
+        `network_name` varchar(32) DEFAULT NULL,
+        `con_type`     enum('static','dynamic','none') NOT NULL DEFAULT 'none',
+        `ip`           varchar(32) NOT NULL,
+        `netmask`      varchar(32) NOT NULL,
+        `gateway`      varchar(32) NOT NULL,
+        `dns`          varchar(32) NOT NULL,
+        `options`      varchar(256) DEFAULT '',
+        `if_type`      enum('ethernet','wireless') NOT NULL DEFAULT 'ethernet',
+        `if_type_id`   int(11)     DEFAULT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Wireless settings ─────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `wireless` (
+        `id`              int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`          int(11)     NOT NULL,
+        `dev_name`        varchar(8)  NOT NULL,
+        `status`          enum('enable','disable') NOT NULL DEFAULT 'enable',
+        `essid`           varchar(64) NOT NULL,
+        `essid_broadcast` enum('enable','disable') NOT NULL DEFAULT 'enable',
+        `mode`            varchar(64) NOT NULL,
+        `encryption_type` enum('none','wep','wpa','wpa2','psk','psk2') NOT NULL DEFAULT 'wpa2',
+        `encryption_key`  varchar(64) DEFAULT NULL,
+        `wds_connection`  varchar(64) DEFAULT NULL,
+        `wds_automatic`   enum('enable','disable') DEFAULT 'disable',
+        `wds_timeout`     int(8)      DEFAULT NULL,
+        `wifi_dev_id`     int(11)     DEFAULT NULL,
+        `hotspot_id`      int(11)     DEFAULT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── MAC filters ───────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `mac_filters` (
+        `id`          int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`      int(11)     NOT NULL,
+        `wifi_dev_id` int(11)     NOT NULL,
+        `mac`         varchar(32) NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Hosts file entries ────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `hosts` (
+        `id`       int(11)      NOT NULL AUTO_INCREMENT,
+        `sys_id`   int(11)      NOT NULL,
+        `hostname` varchar(256) NOT NULL,
+        `ip`       varchar(32)  NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── DHCP host bindings ────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `dhcp_hosts` (
+        `id`     int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id` int(11)     NOT NULL,
+        `mac`    varchar(32) NOT NULL,
+        `ip`     varchar(32) NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Hotspot networks ──────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `hotspot_networks` (
+        `id`                  int(11)       NOT NULL AUTO_INCREMENT,
+        `name`                varchar(32)   NOT NULL,
+        `net`                 varchar(256)  NOT NULL,
+        `radius1`             varchar(1024) NOT NULL,
+        `radius2`             varchar(1024) NOT NULL,
+        `radsecret`           varchar(256)  NOT NULL,
+        `w_url`               varchar(1024) NOT NULL,
+        `l_url`               varchar(1024) NOT NULL,
+        `uamsecret`           varchar(256)  NOT NULL,
+        `db_username`         varchar(64)   NOT NULL,
+        `db_password`         varchar(64)   NOT NULL,
+        `db_host`             varchar(1024) NOT NULL,
+        `db_database`         varchar(64)   NOT NULL,
+        `db_users`            varchar(64)   NOT NULL,
+        `db_classes`          varchar(64)   NOT NULL,
+        `db_users_to_classes` varchar(64)   NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── VIP MAC addresses ─────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `vip_macs` (
+        `id`         int(11)     NOT NULL AUTO_INCREMENT,
+        `hotspot_id` int(11)     NOT NULL,
+        `mac`        varchar(32) NOT NULL,
+        `created`    DATETIME    NOT NULL,
+        `expiration` DATETIME    NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── VIP sites ─────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `vip_sites` (
+        `id`         int(11)      NOT NULL AUTO_INCREMENT,
+        `hotspot_id` int(11)      NOT NULL,
+        `site`       varchar(256) NOT NULL,
+        `created`    DATETIME     NOT NULL,
+        `expiration` DATETIME     NOT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Audit logs ────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `logs` (
+        `id`     int(11)      NOT NULL AUTO_INCREMENT,
+        `time`   DATETIME     NOT NULL,
+        `actor`  varchar(256) NOT NULL,
+        `action` varchar(256) NOT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_logs_time`  (`time`),
+        INDEX `idx_logs_actor` (`actor`(64))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Heartbeat telemetry ───────────────────────────────────────────────
+      -- Includes latitude/longitude (legacy XML) and modem_status /
+      -- wireless_status columns added in commits e06ab78 and 4541520.
+      CREATE TABLE IF NOT EXISTS `heartbeat` (
+        `id`              int(11)      NOT NULL AUTO_INCREMENT,
+        `sys_id`          int(11)      NOT NULL,
+        `time`            DATETIME     NOT NULL,
+        `uptime`          varchar(32)  DEFAULT NULL,
+        `load_avg`        varchar(32)  DEFAULT NULL,
+        `free_mem`        varchar(32)  DEFAULT NULL,
+        `gw`              varchar(32)  DEFAULT NULL,
+        `ip`              varchar(32)  DEFAULT NULL,
+        `mac`             varchar(32)  DEFAULT NULL,
+        `ssid`            varchar(128) DEFAULT NULL,
+        `orion_ver`       varchar(32)  DEFAULT NULL,
+        `nbs`             varchar(512) DEFAULT NULL,
+        `rank`            varchar(512) DEFAULT NULL,
+        `tot_kb_up`       varchar(32)  DEFAULT NULL,
+        `tot_kb_down`     varchar(32)  DEFAULT NULL,
+        `users`           int(4)       DEFAULT NULL,
+        `username`        varchar(32)  DEFAULT NULL,
+        `kb_total`        varchar(32)  DEFAULT NULL,
+        `kb_up`           varchar(32)  DEFAULT NULL,
+        `kb_down`         varchar(32)  DEFAULT NULL,
+        `usermac`         varchar(32)  DEFAULT NULL,
+        `latitude`        varchar(32)  DEFAULT NULL,
+        `longitude`       varchar(32)  DEFAULT NULL,
+        `wireless_status` tinyint(1)   DEFAULT NULL,
+        `modem_status`    tinyint(1)   DEFAULT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_heartbeat_sys_id` (`sys_id`),
+        INDEX `idx_heartbeat_time`   (`time`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Camera devices ────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `cameras` (
+        `id`           int(11)      NOT NULL AUTO_INCREMENT,
+        `sys_id`       int(11)      NOT NULL,
+        `camX`         int(4)       DEFAULT NULL,
+        `cam_name`     varchar(64)  DEFAULT NULL,
+        `username`     varchar(64)  DEFAULT NULL,
+        `password`     varchar(64)  DEFAULT NULL,
+        `mac`          varchar(32)  NOT NULL,
+        `ip`           varchar(32)  DEFAULT NULL,
+        `stream_url`   varchar(256) DEFAULT NULL,
+        `image_url`    varchar(256) DEFAULT NULL,
+        `resolution`   varchar(32)  DEFAULT NULL,
+        `cam_interval` int(11)      DEFAULT 360,
+        `created_at`   DATETIME     NOT NULL,
+        `updated_at`   DATETIME     NOT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_cameras_sys_id` (`sys_id`),
+        INDEX `idx_cameras_mac`    (`mac`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Camera images ─────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `images` (
+        `id`            int(11)      NOT NULL AUTO_INCREMENT,
+        `cam_id`        int(11)      NOT NULL,
+        `sys_id`        int(11)      NOT NULL,
+        `filename`      varchar(512) NOT NULL,
+        `sdcard_status` varchar(32)  DEFAULT NULL,
+        `created_at`    DATETIME     NOT NULL,
+        `updated_at`    DATETIME     NOT NULL,
+        PRIMARY KEY (`id`),
+        INDEX `idx_images_cam_id` (`cam_id`),
+        INDEX `idx_images_sys_id` (`sys_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Device templates ──────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `templates` (
+        `id`               int(11)     NOT NULL AUTO_INCREMENT,
+        `name`             varchar(64) DEFAULT NULL,
+        `description`      text        DEFAULT NULL,
+        `ethernet_ifaces`  int(4)      DEFAULT NULL,
+        `wifi_ifaces`      int(4)      DEFAULT NULL,
+        `wireless_ifaces`  int(4)      DEFAULT NULL,
+        `mesh_iface`       int(11)     DEFAULT NULL,
+        `private_iface`    int(11)     DEFAULT NULL,
+        `public_iface`     int(11)     DEFAULT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      CREATE TABLE IF NOT EXISTS `template_devices` (
+        `id`                 int(11)  NOT NULL AUTO_INCREMENT,
+        `template_id`        int(11)  NOT NULL,
+        `device_name`        varchar(8)  NOT NULL,
+        `device_type`        enum('ethernet','wifi_device','wireless') NOT NULL,
+        `device_capabilites` text        DEFAULT NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
