@@ -23,7 +23,7 @@ maintainers:
 
 dependencies:
   # Bitnami MySQL — deployed as a primary/replica cluster.
-  # Run `helm dependency update ./helm/ac-server` to fetch the chart archive.
+  # Run `helm dependency update charts/optimacs` to fetch chart archives.
   - name: mysql
     version: "11.1.10"
     repository: https://charts.bitnami.com/bitnami
