@@ -424,8 +424,33 @@ helm upgrade optimacs optimacs/optimacs \
 
 ## Chart Source
 
+| Branch | Contents | Purpose |
+|--------|----------|---------|
+| `main` | `charts/optimacs/` source, README | Development and chart authoring |
+| `gh-pages` | `index.yaml`, `optimacs-*.tgz`, `.nojekyll` | GitHub Pages — live Helm repo endpoint |
+
 Chart source lives in [`charts/optimacs/`](charts/optimacs/).
-Packaged releases and `index.yaml` are served from `main` via [GitHub Pages](https://optim-enterprises-bv.github.io/helm-charts).
+Packaged releases and `index.yaml` are served from the [`gh-pages`](https://github.com/optim-enterprises-bv/helm-charts/tree/gh-pages) branch via [GitHub Pages](https://optim-enterprises-bv.github.io/helm-charts).
+
+### Releasing a new chart version
+
+```sh
+# 1. Bump version in charts/optimacs/Chart.yaml, commit to main
+# 2. Package and regenerate index
+helm package charts/optimacs --destination /tmp/release
+helm repo index /tmp/release \
+  --url https://optim-enterprises-bv.github.io/helm-charts \
+  --merge gh-pages/index.yaml   # merge with existing index
+
+# 3. Copy artifacts to gh-pages branch and push
+git checkout gh-pages
+cp /tmp/release/optimacs-<version>.tgz .
+cp /tmp/release/index.yaml .
+git add optimacs-<version>.tgz index.yaml
+git commit -m "release: optimacs <version>"
+git push origin gh-pages
+git checkout main
+```
 
 Full application documentation, Docker Compose setup, and PKI bootstrap guide:
 **[github.com/optim-enterprises-bv/APConfig](https://github.com/optim-enterprises-bv/APConfig)**
