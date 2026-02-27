@@ -1,0 +1,46 @@
+apiVersion: v1
+entries:
+  optimacs:
+  - apiVersion: v2
+    appVersion: 0.4.0
+    created: "2026-02-27T16:42:16.013221+07:00"
+    dependencies:
+    - condition: mysql.enabled
+      name: mysql
+      repository: https://charts.bitnami.com/bitnami
+      version: 11.1.10
+    - condition: redis.enabled
+      name: redis
+      repository: https://charts.bitnami.com/bitnami
+      version: '>=20.0.0'
+    - condition: emqx.enabled
+      name: emqx
+      repository: https://repos.emqx.io/charts
+      version: '>=5.0.0'
+    - condition: stepca.enabled
+      name: step-certificates
+      repository: https://smallstep.github.io/helm-charts
+      version: '>=1.0.0'
+    description: 'Full OptimACS stack — USP Controller (TR-369/ac-server), management
+      web UI (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster, and
+      Smallstep step-ca PKI for certificate lifecycle management. '
+    digest: 138132bf40a4e9687e12bc878deb8bd001116cb79601e0ea99735d761511fef1
+    keywords:
+    - usp
+    - tr-369
+    - acp
+    - access-point
+    - iot
+    - tls
+    - post-quantum
+    - mqtt
+    - pki
+    - certificate-authority
+    maintainers:
+    - name: optim-enterprises-bv
+    name: optimacs
+    type: application
+    urls:
+    - https://optim-enterprises-bv.github.io/helm-charts/optimacs-0.4.0.tgz
+    version: 0.4.0
+generated: "2026-02-27T16:42:16.001798+07:00"
