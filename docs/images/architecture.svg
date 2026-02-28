@@ -1,0 +1,328 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800"
+     font-family="'Segoe UI',system-ui,-apple-system,BlinkMacSystemFont,sans-serif">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#6e7681"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#388bfd"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#3fb950"/>
+    </marker>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#f0883e"/>
+    </marker>
+    <marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#39d353"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#f85149"/>
+    </marker>
+  </defs>
+
+  <!-- ══ Background ══════════════════════════════════════════════════════════ -->
+  <rect width="1200" height="800" fill="#0d1117"/>
+
+  <!-- ══ Title bar ══════════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="1200" height="52" fill="#161b22"/>
+  <text x="600" y="22" text-anchor="middle" font-size="17" font-weight="700" fill="#e6edf3">OptimACS — Full-Stack Architecture</text>
+  <text x="600" y="42" text-anchor="middle" font-size="11" fill="#8b949e">USP/TR-369 Controller · Redis HA Cache · Telemetry Pipeline (Redpanda + Vector + InfluxDB + Grafana) · Smallstep PKI</text>
+
+  <!-- ══ CONTROL PLANE ZONE ══════════════════════════════════════════════════ -->
+  <rect x="16" y="60" width="1168" height="430" fill="none" stroke="#21262d" stroke-width="1.5" stroke-dasharray="6,4" rx="10"/>
+  <rect x="26" y="54" width="135" height="16" fill="#0d1117"/>
+  <text x="94" y="66" text-anchor="middle" font-size="10" fill="#8b949e" font-weight="600" letter-spacing="1">CONTROL PLANE</text>
+
+  <!-- ── Access Points ───────────────────────────────────────────────────── -->
+  <rect x="30" y="76" width="220" height="162" fill="#1c2c4a" stroke="#388bfd" stroke-width="1.5" rx="8"/>
+  <rect x="30" y="76" width="220" height="30" fill="#1f3560" rx="8"/>
+  <rect x="30" y="95" width="220" height="11" fill="#1f3560"/>
+  <text x="140" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#79c0ff">Access Points</text>
+  <text x="140" y="113" text-anchor="middle" font-size="9" fill="#8b949e">ac-client (Rust) · OpenWrt</text>
+  <!-- 3 AP mini-boxes -->
+  <rect x="43" y="122" width="59" height="46" fill="#0d1117" stroke="#388bfd" stroke-width="1" rx="5"/>
+  <text x="73" y="140" text-anchor="middle" font-size="11" fill="#79c0ff">AP-01</text>
+  <text x="73" y="154" text-anchor="middle" font-size="9" fill="#8b949e">MIPS/ARM</text>
+  <text x="73" y="164" text-anchor="middle" font-size="8" fill="#388bfd">USP Agent</text>
+  <rect x="111" y="122" width="59" height="46" fill="#0d1117" stroke="#388bfd" stroke-width="1" rx="5"/>
+  <text x="141" y="140" text-anchor="middle" font-size="11" fill="#79c0ff">AP-02</text>
+  <text x="141" y="154" text-anchor="middle" font-size="9" fill="#8b949e">MIPS/ARM</text>
+  <text x="141" y="164" text-anchor="middle" font-size="8" fill="#388bfd">USP Agent</text>
+  <rect x="179" y="122" width="59" height="46" fill="#0d1117" stroke="#388bfd" stroke-width="1" rx="5"/>
+  <text x="209" y="140" text-anchor="middle" font-size="11" fill="#79c0ff">AP-N</text>
+  <text x="209" y="154" text-anchor="middle" font-size="9" fill="#8b949e">MIPS/ARM</text>
+  <text x="209" y="164" text-anchor="middle" font-size="8" fill="#388bfd">USP Agent</text>
+  <text x="140" y="190" text-anchor="middle" font-size="9" fill="#8b949e">mTLS client certs · TR-181 data model</text>
+  <text x="140" y="204" text-anchor="middle" font-size="9" fill="#8b949e">Boot! Notify · ValueChange · GET/SET</text>
+  <text x="140" y="220" text-anchor="middle" font-size="9" fill="#388bfd">WSS :3491  or  MQTT :1883</text>
+  <text x="140" y="232" text-anchor="middle" font-size="9" fill="#8b949e">post-quantum hybrid TLS 1.3</text>
+
+  <!-- ── EMQX ─────────────────────────────────────────────────────────────── -->
+  <rect x="30" y="255" width="220" height="110" fill="#0a2518" stroke="#3fb950" stroke-width="1.5" rx="8"/>
+  <rect x="30" y="255" width="220" height="28" fill="#0e3320" rx="8"/>
+  <rect x="30" y="269" width="220" height="14" fill="#0e3320"/>
+  <text x="140" y="273" text-anchor="middle" font-size="12" font-weight="700" fill="#56d364">EMQX 5</text>
+  <text x="140" y="291" text-anchor="middle" font-size="9" fill="#8b949e">MQTT broker · USP MQTT MTP</text>
+  <text x="140" y="305" text-anchor="middle" font-size="9" fill="#8b949e">:1883 MQTT · :8883 MQTTS</text>
+  <text x="140" y="319" text-anchor="middle" font-size="9" fill="#8b949e">:8083 WS · :8084 WSS · :18083 UI</text>
+  <text x="140" y="333" text-anchor="middle" font-size="9" fill="#3fb950">usp/v1/{endpoint_id} topics</text>
+  <text x="140" y="352" text-anchor="middle" font-size="9" fill="#8b949e">$share/ac-server/ subscriptions</text>
+
+  <!-- ── ac-server (central, tall) ──────────────────────────────────────── -->
+  <rect x="275" y="76" width="390" height="400" fill="#1a110a" stroke="#f0883e" stroke-width="2" rx="8"/>
+  <rect x="275" y="76" width="390" height="30" fill="#251908" rx="8"/>
+  <rect x="275" y="91" width="390" height="15" fill="#251908"/>
+  <text x="470" y="97" text-anchor="middle" font-size="13" font-weight="700" fill="#ffa657">⚡  ac-server  (USP Controller)</text>
+  <text x="470" y="115" text-anchor="middle" font-size="10" fill="#8b949e">Rust · tokio async · TR-369/1.3</text>
+  <line x1="285" y1="124" x2="655" y2="124" stroke="#30363d" stroke-width="1"/>
+
+  <text x="285" y="142" font-size="10" fill="#e6edf3">  MTP listeners:</text>
+  <text x="285" y="157" font-size="9" fill="#8b949e">    WebSocket MTP  — WSS :3491  (tokio-tungstenite)</text>
+  <text x="285" y="171" font-size="9" fill="#8b949e">    MQTT MTP       — via EMQX   (rumqttc)</text>
+  <text x="285" y="186" font-size="10" fill="#e6edf3">  Transport:</text>
+  <text x="285" y="201" font-size="9" fill="#8b949e">    TLS 1.3 · hybrid X25519 + ML-KEM-768 (NIST PQC)</text>
+  <text x="285" y="216" font-size="9" fill="#8b949e">    Mutual auth (per-device client certs via step-ca)</text>
+  <text x="285" y="231" font-size="10" fill="#e6edf3">  TR-181 handlers:</text>
+  <text x="285" y="246" font-size="9" fill="#8b949e">    DeviceInfo · WiFi · IP · DHCPv4 · Hosts · Cameras</text>
+  <text x="285" y="261" font-size="9" fill="#8b949e">    Firmware streaming · Security.IssueCert() PKI op</text>
+  <text x="285" y="276" font-size="10" fill="#e6edf3">  Caching:</text>
+  <text x="285" y="291" font-size="9" fill="#8b949e">    deadpool-redis · gen_conf_proto() TTL cache</text>
+  <text x="285" y="306" font-size="9" fill="#8b949e">    USP endpoint registry (usp:agent:mac:*) HA shared</text>
+  <line x1="285" y1="318" x2="655" y2="318" stroke="#30363d" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <text x="285" y="334" font-size="10" fill="#3fb950">  Telemetry publishing  (rdkafka 0.36 · fire-and-forget)</text>
+  <text x="285" y="350" font-size="9" fill="#8b949e">    ValueChange event  →  optimacs.heartbeat     (4 partitions)</text>
+  <text x="285" y="365" font-size="9" fill="#8b949e">    Boot! / OnBoard   →  optimacs.device.status  (2 partitions)</text>
+  <text x="285" y="380" font-size="9" fill="#8b949e">    Config push ack   →  optimacs.config.change  (2 partitions)</text>
+  <text x="285" y="395" font-size="9" fill="#8b949e">    acks=1 · 5 ms queue · graceful if Redpanda unreachable</text>
+  <text x="285" y="410" font-size="9" fill="#8b949e">    Enabled by REDPANDA_BROKERS env var (optional)</text>
+  <text x="285" y="428" font-size="9" fill="#ffa657">    :9090 Prometheus metrics  ·  :9090/metrics</text>
+  <text x="285" y="445" font-size="9" fill="#8b949e">    Counters: usp_msgs_total, db_query_duration, cache_hits</text>
+  <text x="285" y="462" font-size="9" fill="#8b949e">    Exposed only when METRICS_PORT is set</text>
+
+  <!-- ── step-ca ─────────────────────────────────────────────────────────── -->
+  <rect x="695" y="76" width="220" height="115" fill="#1e1028" stroke="#d2a8ff" stroke-width="1.5" rx="8"/>
+  <rect x="695" y="76" width="220" height="28" fill="#28153a" rx="8"/>
+  <rect x="695" y="90" width="220" height="14" fill="#28153a"/>
+  <text x="805" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#d2a8ff">step-ca</text>
+  <text x="805" y="113" text-anchor="middle" font-size="9" fill="#8b949e">Smallstep PKI · Certificate Authority</text>
+  <text x="805" y="127" text-anchor="middle" font-size="9" fill="#8b949e">:9000 HTTPS · JWK provisioner</text>
+  <text x="805" y="141" text-anchor="middle" font-size="9" fill="#8b949e">Issues: server cert · device certs</text>
+  <text x="805" y="155" text-anchor="middle" font-size="9" fill="#d2a8ff">CA key never leaves step-ca</text>
+  <text x="805" y="170" text-anchor="middle" font-size="9" fill="#8b949e">OTT-signed CSR → POST /1.0/sign</text>
+  <text x="805" y="184" text-anchor="middle" font-size="9" fill="#8b949e">EC P-256 provisioner key (JWK)</text>
+
+  <!-- ── optimacs-ui ───────────────────────────────────────────────────── -->
+  <rect x="695" y="207" width="220" height="130" fill="#171206" stroke="#e3b341" stroke-width="1.5" rx="8"/>
+  <rect x="695" y="207" width="220" height="28" fill="#221a08" rx="8"/>
+  <rect x="695" y="221" width="220" height="14" fill="#221a08"/>
+  <text x="805" y="227" text-anchor="middle" font-size="12" font-weight="700" fill="#e3b341">optimacs-ui</text>
+  <text x="805" y="244" text-anchor="middle" font-size="9" fill="#8b949e">Management console · :8080</text>
+  <text x="805" y="258" text-anchor="middle" font-size="9" fill="#8b949e">FastAPI 0.115 · Jinja2 · Strawberry</text>
+  <text x="805" y="272" text-anchor="middle" font-size="9" fill="#8b949e">GraphQL subscriptions (graphql-ws)</text>
+  <text x="805" y="286" text-anchor="middle" font-size="9" fill="#e3b341">RBAC · Multi-tenancy · bcrypt</text>
+  <text x="805" y="300" text-anchor="middle" font-size="9" fill="#8b949e">AP provisioning · TR-181 browser</text>
+  <text x="805" y="314" text-anchor="middle" font-size="9" fill="#8b949e">4 Gunicorn+Uvicorn workers</text>
+  <text x="805" y="328" text-anchor="middle" font-size="9" fill="#8b949e">session auth · Secure cookies</text>
+
+  <!-- ── MariaDB ──────────────────────────────────────────────────────────── -->
+  <rect x="695" y="355" width="104" height="115" fill="#1a100a" stroke="#f0883e" stroke-width="1.5" rx="8"/>
+  <rect x="695" y="355" width="104" height="28" fill="#221408" rx="8"/>
+  <rect x="695" y="369" width="104" height="14" fill="#221408"/>
+  <text x="747" y="375" text-anchor="middle" font-size="11" font-weight="700" fill="#ffa657">MariaDB 11</text>
+  <text x="747" y="392" text-anchor="middle" font-size="8" fill="#8b949e">MySQL primary</text>
+  <text x="747" y="404" text-anchor="middle" font-size="8" fill="#8b949e">+ replica</text>
+  <text x="747" y="416" text-anchor="middle" font-size="8" fill="#8b949e">:3306</text>
+  <text x="747" y="428" text-anchor="middle" font-size="8" fill="#8b949e">bitnami/mysql</text>
+  <text x="747" y="440" text-anchor="middle" font-size="8" fill="#ffa657">all tables</text>
+  <text x="747" y="453" text-anchor="middle" font-size="8" fill="#8b949e">InnoDB UTF-8</text>
+  <text x="747" y="463" text-anchor="middle" font-size="8" fill="#8b949e">26 tables</text>
+
+  <!-- ── Redis cluster ───────────────────────────────────────────────────── -->
+  <rect x="811" y="355" width="104" height="115" fill="#0a2010" stroke="#3fb950" stroke-width="1.5" rx="8"/>
+  <rect x="811" y="355" width="104" height="28" fill="#0d2e15" rx="8"/>
+  <rect x="811" y="369" width="104" height="14" fill="#0d2e15"/>
+  <text x="863" y="375" text-anchor="middle" font-size="11" font-weight="700" fill="#56d364">Redis 7</text>
+  <text x="863" y="392" text-anchor="middle" font-size="8" fill="#8b949e">1 primary</text>
+  <text x="863" y="404" text-anchor="middle" font-size="8" fill="#8b949e">2 replicas</text>
+  <text x="863" y="416" text-anchor="middle" font-size="8" fill="#8b949e">+ Sentinel</text>
+  <text x="863" y="428" text-anchor="middle" font-size="8" fill="#8b949e">:6379</text>
+  <text x="863" y="440" text-anchor="middle" font-size="8" fill="#3fb950">auto-failover</text>
+  <text x="863" y="452" text-anchor="middle" font-size="8" fill="#8b949e">conf cache</text>
+  <text x="863" y="464" text-anchor="middle" font-size="8" fill="#8b949e">USP registry</text>
+
+  <!-- ══ Arrows — Control Plane ════════════════════════════════════════════ -->
+  <!-- APs → ac-server (WSS, across top) -->
+  <path d="M250 130 L275 130" stroke="#388bfd" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)"/>
+  <text x="261" y="126" text-anchor="middle" font-size="8" fill="#388bfd">WSS</text>
+
+  <!-- APs → EMQX -->
+  <path d="M140 238 L140 255" stroke="#388bfd" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)"/>
+  <text x="148" y="249" font-size="8" fill="#388bfd">MQTT</text>
+
+  <!-- EMQX → ac-server -->
+  <path d="M250 306 L275 260" stroke="#3fb950" stroke-width="1.5" fill="none" marker-end="url(#arr-green)"/>
+  <text x="257" y="278" font-size="8" fill="#3fb950">USP Records</text>
+
+  <!-- ac-server → step-ca -->
+  <path d="M665 145 L695 134" stroke="#d2a8ff" stroke-width="1.5" fill="none" marker-end="url(#arr-gray)"/>
+  <text x="675" y="137" font-size="8" fill="#d2a8ff">JWK / CSR</text>
+
+  <!-- ac-server → optimacs-ui (shared DB) -->
+  <path d="M665 268 L695 268" stroke="#e3b341" stroke-width="1.5" fill="none" marker-end="url(#arr-gray)" stroke-dasharray="4,3"/>
+  <text x="675" y="263" font-size="8" fill="#e3b341">MariaDB</text>
+
+  <!-- ac-server → MariaDB -->
+  <path d="M665 390 L695 390" stroke="#f0883e" stroke-width="1.5" fill="none" marker-end="url(#arr-orange)"/>
+  <text x="673" y="385" font-size="8" fill="#f0883e">SQL</text>
+
+  <!-- ac-server → Redis -->
+  <path d="M665 420 L811 414" stroke="#3fb950" stroke-width="1.5" fill="none" marker-end="url(#arr-green)"/>
+  <text x="730" y="412" font-size="8" fill="#3fb950">cache</text>
+
+  <!-- step-ca ↔ ac-server bidirectional (cert signing) -->
+  <path d="M695 115 L665 140" stroke="#d2a8ff" stroke-width="1" fill="none" stroke-dasharray="3,3" marker-end="url(#arr-gray)"/>
+
+  <!-- ══ TELEMETRY PIPELINE ZONE ═══════════════════════════════════════════ -->
+  <rect x="16" y="510" width="1168" height="244" fill="none" stroke="#1b4332" stroke-width="1.5" stroke-dasharray="6,4" rx="10"/>
+  <rect x="26" y="504" width="168" height="16" fill="#0d1117"/>
+  <text x="110" y="516" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="600" letter-spacing="1">TELEMETRY PIPELINE  ·  NEW</text>
+  <text x="1100" y="516" text-anchor="middle" font-size="9" fill="#8b949e" font-style="italic">all optional — disabled by default</text>
+
+  <!-- Arrow from ac-server down into telemetry zone -->
+  <path d="M470 476 L470 510" stroke="#3fb950" stroke-width="2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-teal)"/>
+  <text x="476" y="497" font-size="8" fill="#3fb950">Kafka events</text>
+
+  <!-- ── Redpanda ────────────────────────────────────────────────────────── -->
+  <rect x="30" y="526" width="240" height="135" fill="#1a0a08" stroke="#f85149" stroke-width="1.5" rx="8"/>
+  <rect x="30" y="526" width="240" height="28" fill="#260e0b" rx="8"/>
+  <rect x="30" y="540" width="240" height="14" fill="#260e0b"/>
+  <text x="150" y="546" text-anchor="middle" font-size="12" font-weight="700" fill="#ff7b72">Redpanda</text>
+  <text x="150" y="563" text-anchor="middle" font-size="9" fill="#8b949e">Kafka-compatible event broker</text>
+  <text x="150" y="577" text-anchor="middle" font-size="9" fill="#8b949e">:29092 internal · :9092 external</text>
+  <text x="150" y="591" text-anchor="middle" font-size="9" fill="#8b949e">:9644 Admin API · dev-container</text>
+  <line x1="40" y1="600" x2="260" y2="600" stroke="#21262d" stroke-width="1"/>
+  <text x="40" y="613" font-size="8" fill="#ff7b72">  optimacs.heartbeat</text>
+  <text x="180" y="613" font-size="8" fill="#8b949e">4 parts</text>
+  <text x="40" y="626" font-size="8" fill="#ff7b72">  optimacs.device.status</text>
+  <text x="180" y="626" font-size="8" fill="#8b949e">2 parts</text>
+  <text x="40" y="639" font-size="8" fill="#ff7b72">  optimacs.config.change</text>
+  <text x="180" y="639" font-size="8" fill="#8b949e">2 parts</text>
+  <text x="150" y="655" text-anchor="middle" font-size="9" fill="#8b949e">created by redpanda-init Job</text>
+
+  <!-- ── Vector ─────────────────────────────────────────────────────────── -->
+  <rect x="310" y="526" width="220" height="135" fill="#120d26" stroke="#8b5cf6" stroke-width="1.5" rx="8"/>
+  <rect x="310" y="526" width="220" height="28" fill="#1a1235" rx="8"/>
+  <rect x="310" y="540" width="220" height="14" fill="#1a1235"/>
+  <text x="420" y="546" text-anchor="middle" font-size="12" font-weight="700" fill="#a78bfa">Vector 0.41</text>
+  <text x="420" y="563" text-anchor="middle" font-size="9" fill="#8b949e">Rust pipeline agent (by Datadog)</text>
+  <text x="420" y="577" text-anchor="middle" font-size="9" fill="#8b949e">Kafka source → VRL transform → sink</text>
+  <line x1="320" y1="587" x2="520" y2="587" stroke="#21262d" stroke-width="1"/>
+  <text x="420" y="601" text-anchor="middle" font-size="9" fill="#8b949e">VRL enrichment:</text>
+  <text x="420" y="615" text-anchor="middle" font-size="8" fill="#8b949e">topic → measurement name</text>
+  <text x="420" y="629" text-anchor="middle" font-size="8" fill="#8b949e">parse ISO-8601 timestamp</text>
+  <text x="420" y="643" text-anchor="middle" font-size="8" fill="#8b949e">tag: mac · endpoint_id · event</text>
+  <text x="420" y="657" text-anchor="middle" font-size="8" fill="#a78bfa">config: docker/vector.yaml</text>
+
+  <!-- ── InfluxDB v2 ──────────────────────────────────────────────────────── -->
+  <rect x="575" y="526" width="240" height="135" fill="#080e1a" stroke="#0ea5e9" stroke-width="1.5" rx="8"/>
+  <rect x="575" y="526" width="240" height="28" fill="#0c1626" rx="8"/>
+  <rect x="575" y="540" width="240" height="14" fill="#0c1626"/>
+  <text x="695" y="546" text-anchor="middle" font-size="12" font-weight="700" fill="#38bdf8">InfluxDB v2</text>
+  <text x="695" y="563" text-anchor="middle" font-size="9" fill="#8b949e">Time-series database · :8086</text>
+  <text x="695" y="577" text-anchor="middle" font-size="9" fill="#8b949e">Org: optimacs · Bucket: telemetry</text>
+  <line x1="585" y1="587" x2="805" y2="587" stroke="#21262d" stroke-width="1"/>
+  <text x="695" y="601" text-anchor="middle" font-size="9" fill="#8b949e">Measurements:</text>
+  <text x="695" y="615" text-anchor="middle" font-size="8" fill="#38bdf8">heartbeat</text>
+  <text x="695" y="615" text-anchor="start" dx="50" font-size="8" fill="#8b949e">  mac · endpoint_id · param</text>
+  <text x="695" y="629" text-anchor="middle" font-size="8" fill="#38bdf8">device_status</text>
+  <text x="695" y="629" text-anchor="start" dx="50" font-size="8" fill="#8b949e">  mac · event · ip</text>
+  <text x="695" y="645" text-anchor="middle" font-size="9" fill="#8b949e">Flux query language</text>
+  <text x="695" y="659" text-anchor="middle" font-size="9" fill="#38bdf8">30-day retention (configurable)</text>
+
+  <!-- ── Grafana ─────────────────────────────────────────────────────────── -->
+  <rect x="862" y="526" width="300" height="135" fill="#160e04" stroke="#f97316" stroke-width="1.5" rx="8"/>
+  <rect x="862" y="526" width="300" height="28" fill="#201308" rx="8"/>
+  <rect x="862" y="540" width="300" height="14" fill="#201308"/>
+  <text x="1012" y="546" text-anchor="middle" font-size="12" font-weight="700" fill="#fb923c">Grafana 11</text>
+  <text x="1012" y="563" text-anchor="middle" font-size="9" fill="#8b949e">Dashboards + alerting · :3000</text>
+  <text x="1012" y="577" text-anchor="middle" font-size="9" fill="#8b949e">admin / GRAFANA_PASSWORD</text>
+  <line x1="872" y1="587" x2="1152" y2="587" stroke="#21262d" stroke-width="1"/>
+  <text x="1012" y="601" text-anchor="middle" font-size="9" fill="#8b949e">Auto-provisioned via sidecar:</text>
+  <text x="1012" y="615" text-anchor="middle" font-size="8" fill="#fb923c">InfluxDB-Telemetry  datasource</text>
+  <text x="1012" y="629" text-anchor="middle" font-size="8" fill="#8b949e">OptimACS — Device Telemetry dashboard</text>
+  <text x="1012" y="643" text-anchor="middle" font-size="8" fill="#8b949e">Panels: Active Devices · Heartbeats</text>
+  <text x="1012" y="657" text-anchor="middle" font-size="8" fill="#8b949e">Lifecycle Events · Parameter series</text>
+
+  <!-- ══ Arrows — Telemetry Pipeline ══════════════════════════════════════ -->
+  <!-- Redpanda → Vector -->
+  <path d="M270 595 L310 595" stroke="#8b5cf6" stroke-width="2" fill="none" marker-end="url(#arr-gray)"/>
+  <text x="290" y="590" text-anchor="middle" font-size="8" fill="#8b949e">Kafka</text>
+  <text x="290" y="601" text-anchor="middle" font-size="8" fill="#8b949e">consume</text>
+
+  <!-- Vector → InfluxDB -->
+  <path d="M530 595 L575 595" stroke="#0ea5e9" stroke-width="2" fill="none" marker-end="url(#arr-gray)"/>
+  <text x="552" y="590" text-anchor="middle" font-size="8" fill="#8b949e">Influx</text>
+  <text x="552" y="601" text-anchor="middle" font-size="8" fill="#8b949e">v2 write</text>
+
+  <!-- InfluxDB → Grafana -->
+  <path d="M815 595 L862 595" stroke="#f97316" stroke-width="2" fill="none" marker-end="url(#arr-gray)"/>
+  <text x="838" y="590" text-anchor="middle" font-size="8" fill="#8b949e">Flux</text>
+  <text x="838" y="601" text-anchor="middle" font-size="8" fill="#8b949e">query</text>
+
+  <!-- ac-server → Redpanda (large diagonal arrow through zone separator) -->
+  <path d="M352 476 L150 526" stroke="#3fb950" stroke-width="2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-teal)"/>
+  <text x="220" y="500" font-size="8" fill="#3fb950">rdkafka</text>
+
+  <!-- ══ LEGEND ════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="698" width="1140" height="88" fill="#161b22" rx="8"/>
+  <text x="44" y="716" font-size="10" font-weight="600" fill="#e6edf3">Legend</text>
+  <line x1="88" y1="712" x2="1160" y2="712" stroke="#21262d" stroke-width="1"/>
+
+  <!-- Legend items row 1 -->
+  <rect x="44" y="724" width="12" height="12" fill="#1c2c4a" stroke="#388bfd" stroke-width="1.5" rx="2"/>
+  <text x="62" y="734" font-size="9" fill="#8b949e">Access Points (OpenWrt APs)</text>
+
+  <rect x="220" y="724" width="12" height="12" fill="#0a2518" stroke="#3fb950" stroke-width="1.5" rx="2"/>
+  <text x="238" y="734" font-size="9" fill="#8b949e">Network / Cache (EMQX, Redis)</text>
+
+  <rect x="420" y="724" width="12" height="12" fill="#1a110a" stroke="#f0883e" stroke-width="1.5" rx="2"/>
+  <text x="438" y="734" font-size="9" fill="#8b949e">Core Controller (ac-server)</text>
+
+  <rect x="600" y="724" width="12" height="12" fill="#1e1028" stroke="#d2a8ff" stroke-width="1.5" rx="2"/>
+  <text x="618" y="734" font-size="9" fill="#8b949e">PKI (step-ca)</text>
+
+  <rect x="700" y="724" width="12" height="12" fill="#171206" stroke="#e3b341" stroke-width="1.5" rx="2"/>
+  <text x="718" y="734" font-size="9" fill="#8b949e">Management UI</text>
+
+  <rect x="820" y="724" width="12" height="12" fill="#1a100a" stroke="#f0883e" stroke-width="1.5" rx="2"/>
+  <text x="838" y="734" font-size="9" fill="#8b949e">Databases (MariaDB)</text>
+
+  <!-- Legend items row 2 -->
+  <rect x="44" y="748" width="12" height="12" fill="#1a0a08" stroke="#f85149" stroke-width="1.5" rx="2"/>
+  <text x="62" y="758" font-size="9" fill="#8b949e">Redpanda (event broker)</text>
+
+  <rect x="220" y="748" width="12" height="12" fill="#120d26" stroke="#8b5cf6" stroke-width="1.5" rx="2"/>
+  <text x="238" y="758" font-size="9" fill="#8b949e">Vector (pipeline agent)</text>
+
+  <rect x="420" y="748" width="12" height="12" fill="#080e1a" stroke="#0ea5e9" stroke-width="1.5" rx="2"/>
+  <text x="438" y="758" font-size="9" fill="#8b949e">InfluxDB v2 (time-series)</text>
+
+  <rect x="600" y="748" width="12" height="12" fill="#160e04" stroke="#f97316" stroke-width="1.5" rx="2"/>
+  <text x="618" y="758" font-size="9" fill="#8b949e">Grafana (dashboards)</text>
+
+  <!-- Arrow legend -->
+  <line x1="820" y1="754" x2="860" y2="754" stroke="#388bfd" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <text x="868" y="758" font-size="9" fill="#8b949e">data / control flow</text>
+
+  <line x1="960" y1="754" x2="1000" y2="754" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-teal)"/>
+  <text x="1008" y="758" font-size="9" fill="#8b949e">telemetry events</text>
+
+  <!-- Footer -->
+  <text x="600" y="779" text-anchor="middle" font-size="9" fill="#484f58">
+    Telemetry pipeline (Redpanda · Vector · InfluxDB · Grafana) is optional — all components disabled by default.
+    Enable per service via env vars (docker-compose) or Helm values.
+  </text>
+</svg>
