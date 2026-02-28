@@ -35,7 +35,7 @@ OptimACS provides centralized provisioning, configuration delivery, firmware man
 
 ## Architecture
 
-![OptimACS System Architecture](https://raw.githubusercontent.com/optim-enterprises-bv/helm-charts/main/docs/images/architecture.png)
+![OptimACS System Architecture](https://raw.githubusercontent.com/optim-enterprises-bv/helm-charts/main/docs/images/architecture.svg)
 
 ---
 
