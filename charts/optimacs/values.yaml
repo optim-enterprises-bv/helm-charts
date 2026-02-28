@@ -739,3 +739,176 @@ mysql:
         `device_capabilites` text        DEFAULT NULL,
         PRIMARY KEY (`id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+# ── Redpanda (Kafka-compatible event broker) ──────────────────────────────────
+# Publishes USP heartbeat and lifecycle events from ac-server.
+# Vector consumes these topics and writes to InfluxDB v2.
+#
+# Topic schema:
+#   optimacs.heartbeat     — per-device ValueChange parameter events  (high-freq)
+#   optimacs.device.status — Boot! / OnBoardRequest lifecycle events  (low-freq)
+#   optimacs.config.change — configuration-push delivery confirmations (low-freq)
+#
+# Quickstart (embedded single-broker):
+#   helm install optimacs ./charts/optimacs \
+#     --set redpanda.enabled=true \
+#     --set redpanda.storage.persistentVolume.enabled=true
+#
+# External Redpanda/Kafka (preferred for production):
+#   --set redpanda.externalBrokers="redpanda-0.redpanda.default.svc:9093"
+#
+# To disable telemetry publishing entirely, leave both .enabled=false and
+# .externalBrokers="" (empty).
+
+redpanda:
+  # Set true to deploy an in-cluster Redpanda broker (single-broker dev setup).
+  # Requires at least 2 GiB RAM per pod; set replicas / storage as needed.
+  enabled: false
+
+  # External broker list — used when redpanda.enabled=false.
+  # Comma-separated host:port pairs pointing at your Redpanda/Kafka cluster.
+  # Leave empty to disable telemetry event publishing by ac-server.
+  externalBrokers: ""
+
+  # ── Redpanda sub-chart overrides (redpanda.enabled=true only) ─────────────
+  # Full parameter reference: https://docs.redpanda.com/docs/deploy/deployment-option/self-hosted/kubernetes/kubernetes-deploy/
+  statefulset:
+    replicas: 1            # 1 for dev; 3+ for production
+    initContainers:
+      setDataDirOwnership:
+        enabled: true
+  storage:
+    persistentVolume:
+      enabled: false       # disable for ephemeral dev; enable for production
+      size: 20Gi
+      storageClass: ""
+  resources:
+    memory:
+      container:
+        min: 2Gi
+        max: 3Gi
+
+# ── InfluxDB v2 (time-series telemetry store) ─────────────────────────────────
+# Stores heartbeat and lifecycle events forwarded by Vector.
+# Bucket: telemetry  |  Org: optimacs  |  Retention: 30 days (configurable)
+#
+# Quickstart (embedded):
+#   helm install optimacs ./charts/optimacs \
+#     --set influxdb2.enabled=true \
+#     --set influxdb2.adminUser.password=<choose> \
+#     --set influxdb2.adminUser.token=$(openssl rand -hex 32)
+#
+# External InfluxDB (preferred for production):
+#   --set influxdb2.externalUrl="http://influxdb.monitoring.svc:8086"
+#   --set influxdb2.adminUser.token=<your-token>
+
+influxdb2:
+  # Set true to deploy an in-cluster InfluxDB v2 instance.
+  enabled: false
+
+  # External InfluxDB v2 endpoint — used when influxdb2.enabled=false.
+  externalUrl: ""
+
+  # ── Credentials and init config ──────────────────────────────────────────
+  # These are passed to the influxdb2 sub-chart AND used by Vector / Grafana
+  # ConfigMap templates.  Set ALL when influxdb2.enabled=true.
+  adminUser:
+    # Admin API token — used by Vector (write) and Grafana (read).    Required.
+    # Generate with: openssl rand -hex 32
+    token: ""
+    # Admin UI password.  Required when influxdb2.enabled=true.
+    password: ""
+    organization: optimacs
+    bucket: telemetry
+    retentionPolicy: 30d
+    user: admin
+
+  # ── influxdb2 sub-chart overrides ─────────────────────────────────────────
+  # Full parameter reference: https://github.com/influxdata/helm-charts
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+
+# ── Vector (telemetry pipeline agent) ─────────────────────────────────────────
+# Lightweight Rust data pipeline: Redpanda → VRL transform → InfluxDB v2.
+# Deployed as a Kubernetes Deployment with a ConfigMap-mounted vector.yaml.
+# No sub-chart — our templates in vector-configmap.yaml + vector-deployment.yaml.
+#
+# Requires at least one of: redpanda.enabled=true or redpanda.externalBrokers set.
+# AND: influxdb2.enabled=true or influxdb2.externalUrl set.
+# AND: influxdb2.adminUser.token set.
+
+vector:
+  # Set true to deploy the Vector pipeline agent.
+  enabled: false
+
+  image:
+    repository: timberio/vector
+    tag: "0.41.1-alpine"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ── Grafana (dashboards + alerting) ───────────────────────────────────────────
+# Pre-provisioned with an InfluxDB v2 datasource and the OptimACS heartbeat
+# dashboard.  Uses the grafana/grafana sub-chart's sidecar feature for
+# zero-touch datasource + dashboard loading.
+#
+# Quickstart:
+#   helm install optimacs ./charts/optimacs \
+#     --set grafana.enabled=true \
+#     --set grafana.adminPassword=<choose> \
+#     --set grafana.env.INFLUXDB_TOKEN=<same-as-influxdb2.adminUser.token>
+
+grafana:
+  # Set true to deploy a Grafana instance.
+  enabled: false
+
+  # Grafana admin password.  Required when grafana.enabled=true.
+  adminPassword: ""
+
+  # Environment variables injected into the Grafana pod.
+  # INFLUXDB_TOKEN is substituted via ${INFLUXDB_TOKEN} in the provisioned
+  # datasource ConfigMap (created by telemetry-grafana-configmaps.yaml).
+  env:
+    INFLUXDB_TOKEN: ""     # set to influxdb2.adminUser.token value
+    INFLUXDB_ORG: optimacs
+    INFLUXDB_BUCKET: telemetry
+
+  # ── Sidecar — auto-loads ConfigMaps with grafana_datasource/dashboard labels ─
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /var/lib/grafana/dashboards/optimacs
+
+  # ── grafana sub-chart overrides ───────────────────────────────────────────
+  # Full parameter reference: https://github.com/grafana/helm-charts/tree/main/charts/grafana
+  service:
+    type: ClusterIP
+    port: 3000
+
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

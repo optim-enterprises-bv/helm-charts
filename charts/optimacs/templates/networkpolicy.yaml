@@ -1,7 +1,7 @@
 {{- if .Values.networkPolicy.enabled }}
 # ── ac-server NetworkPolicy ───────────────────────────────────────────────────
 # Ingress: ACP protocol port from any source (access points are external).
-# Egress: MySQL only, plus DNS and optional Redis.
+# Egress: MySQL, optional Redis, optional Redpanda (telemetry), optional step-ca.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -31,6 +31,15 @@ spec:
     {{- if .Values.redis.enabled }}
     - ports:
         - port: 6379
+          protocol: TCP
+    {{- end }}
+    {{- $redpandaBrokers := include "optimacs.telemetry.redpanda.brokers" . }}
+    {{- if $redpandaBrokers }}
+    # Redpanda / Kafka — telemetry event publishing (ac-server → Redpanda)
+    - ports:
+        - port: 9092
+          protocol: TCP
+        - port: 9093
           protocol: TCP
     {{- end }}
     # DNS
