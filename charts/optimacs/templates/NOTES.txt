@@ -115,31 +115,34 @@ Topics are created automatically by the redpanda-init Job on first start.
   Telemetry disabled — set redpanda.enabled=true or redpanda.externalBrokers
   to start publishing USP events to Redpanda.
 {{- end }}
-{{- if or .Values.influxdb2.enabled .Values.influxdb2.externalUrl }}
-
-InfluxDB v2 : {{ include "optimacs.telemetry.influxdb.url" . }}
-Org         : {{ .Values.influxdb2.adminUser.organization }}
-Bucket      : {{ .Values.influxdb2.adminUser.bucket }}
-Retention   : {{ .Values.influxdb2.adminUser.retentionPolicy }}
-
-  Port-forward to access the InfluxDB UI:
-    kubectl port-forward svc/{{ .Release.Name }}-influxdb2 8086:8086 \
-      --namespace {{ .Release.Namespace }}
-  Then open: http://localhost:8086
-{{- end }}
 {{- if .Values.vector.enabled }}
+{{- $vmUrl := include "optimacs.telemetry.victoriametrics.url" . }}
+{{- if $vmUrl }}
 
-Vector pipeline is running — consuming Redpanda topics → InfluxDB v2.
-  kubectl logs -l app.kubernetes.io/name={{ include "optimacs.vector.fullname" . }} \
-    --namespace {{ .Release.Namespace }} --tail=50
+Vector pipeline : running
+  Route:   Redpanda topics → log_to_metric → VictoriaMetrics (prometheus_remote_write)
+  Remote-write endpoint: {{ $vmUrl }}
+
+  Metrics written:
+    optimacs_heartbeat_gauge{mac,endpoint_id,param_path}   — USP ValueChange values
+    optimacs_device_events_total{mac,endpoint_id,event}    — Boot!/OnBoard counters
+    optimacs_config_changes_total{mac,endpoint_id}         — config-push counters
+
+  Check Vector logs:
+    kubectl logs -l app.kubernetes.io/component=vector \
+      --namespace {{ .Release.Namespace }} --tail=50
+
+  Dashboard ConfigMap "{{ include "ac-server.fullname" . }}-grafana-dashboards"
+  carries label {{ .Values.victoriametrics.grafana.dashboardLabel }}={{ .Values.victoriametrics.grafana.dashboardLabelValue }}
+  so the Grafana sidecar auto-loads it.
+  Datasource UID used: {{ .Values.victoriametrics.grafana.datasourceUid }}
+  (override with --set victoriametrics.grafana.datasourceUid=<your-uid> if needed)
+{{- else }}
+
+  vector.enabled=true but victoriametrics.remoteWriteUrl is not set.
+  Set it to the /api/v1/write endpoint of your VictoriaMetrics instance:
+    --set victoriametrics.remoteWriteUrl=http://victoria-metrics.<ns>.svc:8428/api/v1/write
 {{- end }}
-{{- if .Values.grafana.enabled }}
-
-Grafana (InfluxDB datasource + OptimACS dashboard pre-provisioned):
-  Port-forward:
-    kubectl port-forward svc/{{ .Release.Name }}-grafana 3000:3000 \
-      --namespace {{ .Release.Namespace }}
-  Then open: http://localhost:3000  (admin / {{ .Values.grafana.adminPassword | default "<GRAFANA_PASSWORD>" }})
 {{- end }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

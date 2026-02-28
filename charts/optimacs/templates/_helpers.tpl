@@ -187,18 +187,17 @@ Returns an empty string when both are unset — ac-server disables telemetry.
 {{- end }}
 
 {{/*
-InfluxDB v2 endpoint URL.
-When the embedded InfluxDB v2 sub-chart is enabled this resolves to the
-in-cluster service (<release>-influxdb2:8086).
-For an external instance supply influxdb2.externalUrl.
-Returns an empty string when both are unset.
+VictoriaMetrics Prometheus remote-write URL.
+Returns victoriametrics.remoteWriteUrl verbatim — the operator must supply the
+full URL of the existing in-cluster VictoriaMetrics /api/v1/write endpoint.
+Returns an empty string when unset; the Vector deployment is skipped in that case.
+
+Example values:
+  http://victoria-metrics.monitoring.svc:8428/api/v1/write
+  http://vmsingle-stack.monitoring.svc:8428/api/v1/write
 */}}
-{{- define "optimacs.telemetry.influxdb.url" -}}
-{{- if .Values.influxdb2.enabled -}}
-{{- printf "http://%s-influxdb2:8086" .Release.Name }}
-{{- else -}}
-{{- .Values.influxdb2.externalUrl }}
-{{- end }}
+{{- define "optimacs.telemetry.victoriametrics.url" -}}
+{{- .Values.victoriametrics.remoteWriteUrl }}
 {{- end }}
 
 {{/*

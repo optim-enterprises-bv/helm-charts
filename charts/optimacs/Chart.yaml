@@ -4,7 +4,9 @@ description: |
   Full OptimACS stack — USP Controller (TR-369/ac-server), management web UI
   (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster,
   Smallstep step-ca PKI for certificate lifecycle management, and an optional
-  streaming telemetry pipeline (Redpanda + Vector + InfluxDB v2 + Grafana).
+  streaming telemetry pipeline (Redpanda → Vector → VictoriaMetrics).
+  Integrates with an existing VictoriaMetrics stack via Prometheus remote-write;
+  no standalone InfluxDB or Grafana sub-charts required.
 type: application
 version: 0.6.0
 appVersion: "0.6.0"
@@ -64,18 +66,7 @@ dependencies:
     repository: https://charts.redpanda.com
     condition: redpanda.enabled
 
-  # InfluxDB v2 — purpose-built time-series store for device telemetry.
-  # Set influxdb2.enabled=true; supply adminUser.token for Vector + Grafana.
-  # Full chart reference: https://github.com/influxdata/helm-charts
-  - name: influxdb2
-    version: ">=2.0.0"
-    repository: https://helm.influxdata.com/
-    condition: influxdb2.enabled
-
-  # Grafana — dashboards and alerting on top of InfluxDB telemetry data.
-  # Datasource + starter dashboard are provisioned automatically via sidecars.
-  # Full chart reference: https://github.com/grafana/helm-charts
-  - name: grafana
-    version: ">=8.0.0"
-    repository: https://grafana.github.io/helm-charts
-    condition: grafana.enabled
+  # VictoriaMetrics / Grafana are expected to already exist in the cluster.
+  # Vector forwards metrics via Prometheus remote-write to the existing VM stack.
+  # No sub-charts for InfluxDB or Grafana — set victoriametrics.remoteWriteUrl
+  # in values.yaml to point at your cluster's VictoriaMetrics remote-write endpoint.
