@@ -1,4 +1,4 @@
-APConfig has been deployed.
+OptimACS has been deployed.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  Prerequisites (must exist before helm install)
@@ -19,9 +19,9 @@ APConfig has been deployed.
 {{- if .Values.mysql.enabled }}
 
 Architecture : {{ .Values.mysql.architecture }}
-Primary host : {{ include "apconfig.mysql.host" . }}.{{ .Release.Namespace }}.svc.cluster.local:3306
-Database     : {{ include "apconfig.mysql.database" . }}
-User         : {{ include "apconfig.mysql.user" . }}
+Primary host : {{ include "optimacs.mysql.host" . }}.{{ .Release.Namespace }}.svc.cluster.local:3306
+Database     : {{ include "optimacs.mysql.database" . }}
+User         : {{ include "optimacs.mysql.user" . }}
 
 The schema is created automatically via initdbScripts on first boot.
 Wait for the primary pod to be Ready before the ac-server and UI pods
@@ -33,7 +33,7 @@ will pass their readiness probes:
 Create the first admin user (run once after the UI pod is Ready):
 
   kubectl exec -n {{ .Release.Namespace }} \
-    $(kubectl get pod -n {{ .Release.Namespace }} -l "{{ include "apconfig.ui.selectorLabels" . }}" -o name | head -1) \
+    $(kubectl get pod -n {{ .Release.Namespace }} -l "{{ include "optimacs.ui.selectorLabels" . }}" -o name | head -1) \
     -- python create_admin.py --username admin \
                               --password <choose-a-password> \
                               --role full_admin
@@ -66,7 +66,7 @@ Create the first admin user (run once after the UI pod is Ready):
   Management UI:  http{{ if .Values.ui.ingress.tls }}s{{ end }}://{{ .Values.ui.ingress.hostname }}
 {{- else }}
   Port-forward to access the UI locally:
-    kubectl port-forward svc/{{ include "apconfig.ui.fullname" . }} 8080:{{ .Values.ui.service.port }} \
+    kubectl port-forward svc/{{ include "optimacs.ui.fullname" . }} 8080:{{ .Values.ui.service.port }} \
       --namespace {{ .Release.Namespace }}
 
   Then open: http://localhost:8080
@@ -75,6 +75,27 @@ Create the first admin user (run once after the UI pod is Ready):
   GraphQL playground: <ui-url>/graphql
 {{- else }}
   ui.enabled=false — web UI not deployed.
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Redis cluster
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.redis.enabled }}
+
+Architecture : {{ .Values.redis.architecture }} (1 primary + {{ .Values.redis.replica.replicaCount }} replicas + Sentinel)
+Primary svc  : {{ .Release.Name }}-redis-master:6379
+Sentinel svc : {{ .Release.Name }}-redis:26379
+
+Redis Sentinel provides automatic primary failover.  The master service
+selector is updated by Sentinel so ac-server reconnects transparently.
+
+Check cluster status:
+  kubectl exec -n {{ .Release.Namespace }} \
+    $(kubectl get pod -n {{ .Release.Namespace }} -l "app.kubernetes.io/name=redis,app.kubernetes.io/component=master" -o name | head -1) \
+    -- redis-cli info replication
+{{- else }}
+  redis.enabled=false — Redis cache/registry disabled.
+  Enable with: --set redis.enabled=true
 {{- end }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

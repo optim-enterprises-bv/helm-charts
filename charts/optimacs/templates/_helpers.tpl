@@ -91,7 +91,7 @@ When the embedded MySQL sub-chart is enabled this resolves to the bitnami/mysql
 primary service (<release>-mysql-primary).  For an external DB the operator
 must set config.dbHost to their host.
 */}}
-{{- define "apconfig.mysql.host" -}}
+{{- define "optimacs.mysql.host" -}}
 {{- if .Values.mysql.enabled -}}
 {{- printf "%s-mysql-primary" .Release.Name }}
 {{- else -}}
@@ -99,7 +99,7 @@ must set config.dbHost to their host.
 {{- end }}
 {{- end }}
 
-{{- define "apconfig.mysql.database" -}}
+{{- define "optimacs.mysql.database" -}}
 {{- if .Values.mysql.enabled -}}
 {{- .Values.mysql.auth.database }}
 {{- else -}}
@@ -107,7 +107,7 @@ must set config.dbHost to their host.
 {{- end }}
 {{- end }}
 
-{{- define "apconfig.mysql.user" -}}
+{{- define "optimacs.mysql.user" -}}
 {{- if .Values.mysql.enabled -}}
 {{- .Values.mysql.auth.username }}
 {{- else -}}
@@ -121,25 +121,25 @@ Web UI helpers
 ──────────────────────────────────────────────────────────────────────────────
 */}}
 
-{{- define "apconfig.ui.fullname" -}}
+{{- define "optimacs.ui.fullname" -}}
 {{- printf "%s-ui" (include "ac-server.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "apconfig.ui.selectorLabels" -}}
+{{- define "optimacs.ui.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "ac-server.name" . }}-ui
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-{{- define "apconfig.ui.labels" -}}
+{{- define "optimacs.ui.labels" -}}
 helm.sh/chart: {{ include "ac-server.chart" . }}
-{{ include "apconfig.ui.selectorLabels" . }}
+{{ include "optimacs.ui.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "apconfig.ui.secretName" -}}
+{{- define "optimacs.ui.secretName" -}}
 {{- printf "%s-ui-secret" (include "ac-server.fullname" .) }}
 {{- end }}
 
@@ -155,7 +155,15 @@ When the embedded Redis sub-chart is enabled this resolves to the bitnami/redis
 master service URL.  For an external Redis instance the operator must set
 redis.url directly.  Returns an empty string when Redis is disabled.
 */}}
-{{- define "apconfig.redis.url" -}}
+{{/*
+Redis connection URL.
+When the embedded Redis sub-chart is enabled (architecture: replication) this
+resolves to the bitnami/redis primary (master) service, which Sentinel keeps
+updated after any failover — no URL change required.
+For an external Redis instance set redis.url directly.
+Returns an empty string when Redis is disabled.
+*/}}
+{{- define "optimacs.redis.url" -}}
 {{- if .Values.redis.enabled -}}
 {{- printf "redis://%s-redis-master:6379" .Release.Name }}
 {{- else -}}

@@ -5,8 +5,8 @@ description: |
   (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster, and
   Smallstep step-ca PKI for certificate lifecycle management.
 type: application
-version: 0.4.0
-appVersion: "0.4.0"
+version: 0.5.0
+appVersion: "0.5.0"
 keywords:
   - usp
   - tr-369

@@ -177,30 +177,56 @@ autoscaling:
 networkPolicy:
   enabled: false
 
-# ── Redis cache ───────────────────────────────────────────────────────────────
-# When enabled, ac-server caches generate_conf_proto() results in Redis,
-# eliminating the 8-query DB round trip on every GET_CONFIG / CHECK_UPDATE.
+# ── Redis cluster ─────────────────────────────────────────────────────────────
+# bitnami/redis sub-chart in replication mode:
+#   • 1 primary StatefulSet  — all writes + reads
+#   • 2 replica StatefulSets — hot standby / read offload
+#   • 3 Sentinel pods        — automatic primary election on failure
 #
-# Option A — embedded (bitnami/redis sub-chart):
-#   helm install optimacs ./helm/ac-server --set redis.enabled=true
+# ac-server connects to the primary service ({release}-redis-master:6379).
+# After a failover Sentinel re-points the service selector; ac-server
+# reconnects transparently via deadpool-redis connection pool retry.
 #
-# Option B — external Redis:
+# REQUIRED for horizontal scaling (replicaCount > 1): the endpoint registry
+# (usp:agent:mac:*) must be shared across all ac-server replicas.
+#
+# Option A — embedded cluster (bitnami/redis sub-chart):
+#   helm install optimacs ./charts/optimacs --set redis.enabled=true
+#
+# Option B — external Redis (single node or your own cluster):
 #   --set redis.url="redis://:password@my-redis:6379/0"
 
 redis:
-  # REQUIRED for horizontal scaling (replicaCount > 1).
-  # When enabled, ac-server uses Redis as a shared endpoint registry so that
-  # agent MAC addresses are visible across all replicas.
-  # Enable with: --set redis.enabled=true
   enabled: false
-  # External Redis URL (used when redis.enabled=false).
+  # External Redis URL — used when redis.enabled=false and url is non-empty.
   url: ""
   # TTL in seconds for cached config protobuf payloads.
   cacheTtl: 300
-  # Bitnami sub-chart settings (used only when redis.enabled=true).
-  architecture: standalone
+
+  # ── Bitnami redis sub-chart (redis.enabled=true only) ─────────────────────
+  # "replication" deploys 1 primary + N replicas + 3 Sentinel pods for HA.
+  # Full parameter reference:
+  #   https://github.com/bitnami/charts/tree/main/bitnami/redis#parameters
+  architecture: replication
+
+  replica:
+    # Number of read replicas.  2 = total of 3 Redis pods (1 primary + 2 replicas).
+    replicaCount: 2
+    persistence:
+      enabled: false   # replicas are read cache — no durable storage needed
+
+  sentinel:
+    # Deploy Redis Sentinel alongside each replica for automatic failover.
+    enabled: true
+    quorum: 2          # majority of 3 Sentinel instances required for failover
+
+  primary:
+    persistence:
+      enabled: false   # cache workload; persistence not required
+
   auth:
-    enabled: false
+    enabled: false     # enable and set password for production deployments
+    # password: ""     # --set redis.auth.password=<value>
 
 # ── USP / TR-369 ──────────────────────────────────────────────────────────────
 # ac-server acts as a USP Controller.  Agents (ac-client on APs) connect via
