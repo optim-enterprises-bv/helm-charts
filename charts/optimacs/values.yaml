@@ -742,7 +742,7 @@ mysql:
 
 # ── Redpanda (Kafka-compatible event broker) ──────────────────────────────────
 # Publishes USP heartbeat and lifecycle events from ac-server.
-# Vector consumes these topics and writes to InfluxDB v2.
+# Vector consumes these topics and forwards metrics to VictoriaMetrics.
 #
 # Topic schema:
 #   optimacs.heartbeat     — per-device ValueChange parameter events  (high-freq)
@@ -788,56 +788,57 @@ redpanda:
         min: 2Gi
         max: 3Gi
 
-# ── InfluxDB v2 (time-series telemetry store) ─────────────────────────────────
-# Stores heartbeat and lifecycle events forwarded by Vector.
-# Bucket: telemetry  |  Org: optimacs  |  Retention: 30 days (configurable)
+# ── VictoriaMetrics (existing in-cluster time-series backend) ─────────────────
+# Vector writes Prometheus remote-write metrics to the existing VictoriaMetrics
+# stack already deployed in your cluster.  No new VM pods are created by this
+# chart — only the Vector pipeline agent is deployed.
 #
-# Quickstart (embedded):
-#   helm install optimacs ./charts/optimacs \
-#     --set influxdb2.enabled=true \
-#     --set influxdb2.adminUser.password=<choose> \
-#     --set influxdb2.adminUser.token=$(openssl rand -hex 32)
+# Set remoteWriteUrl to the /api/v1/write endpoint of your VictoriaMetrics
+# instance.  For VictoriaMetrics Operator, the URL is typically:
+#   http://vmsingle-<name>.<namespace>.svc:8428/api/v1/write
+# For a VMAgent or VictoriaMetrics standalone:
+#   http://victoria-metrics.<namespace>.svc:8428/api/v1/write
 #
-# External InfluxDB (preferred for production):
-#   --set influxdb2.externalUrl="http://influxdb.monitoring.svc:8086"
-#   --set influxdb2.adminUser.token=<your-token>
+# Dashboard integration:
+#   The telemetry-grafana-configmaps template creates a dashboard ConfigMap
+#   labelled grafana_dashboard=1 so the Grafana sidecar auto-loads it.
+#   Set grafana.datasourceUid to the UID of your existing VictoriaMetrics /
+#   Prometheus datasource in Grafana (find it at Grafana → Configuration →
+#   Data Sources → VictoriaMetrics → copy the UID from the URL).
 
-influxdb2:
-  # Set true to deploy an in-cluster InfluxDB v2 instance.
-  enabled: false
+victoriametrics:
+  # Prometheus remote-write endpoint of the existing VictoriaMetrics instance.
+  # Required when vector.enabled=true.
+  # Example: http://victoria-metrics.monitoring.svc:8428/api/v1/write
+  remoteWriteUrl: ""
 
-  # External InfluxDB v2 endpoint — used when influxdb2.enabled=false.
-  externalUrl: ""
-
-  # ── Credentials and init config ──────────────────────────────────────────
-  # These are passed to the influxdb2 sub-chart AND used by Vector / Grafana
-  # ConfigMap templates.  Set ALL when influxdb2.enabled=true.
-  adminUser:
-    # Admin API token — used by Vector (write) and Grafana (read).    Required.
-    # Generate with: openssl rand -hex 32
-    token: ""
-    # Admin UI password.  Required when influxdb2.enabled=true.
+  # Optional HTTP Basic Auth for the remote-write endpoint.
+  basicAuth:
+    username: ""
     password: ""
-    organization: optimacs
-    bucket: telemetry
-    retentionPolicy: 30d
-    user: admin
 
-  # ── influxdb2 sub-chart overrides ─────────────────────────────────────────
-  # Full parameter reference: https://github.com/influxdata/helm-charts
-  persistence:
-    enabled: true
-    size: 20Gi
-    storageClass: ""
+  # ── Grafana dashboard sidecar integration ──────────────────────────────────
+  grafana:
+    # UID of the existing VictoriaMetrics / Prometheus datasource in Grafana.
+    # Find it at: Grafana → Configuration → Data Sources → <your-ds> → URL uid=...
+    # Common UIDs: "victoriametrics", "prometheus", "vm-datasource"
+    datasourceUid: "victoriametrics"
+
+    # Human-readable name of the datasource (shown in panel dropdowns).
+    datasourceName: "VictoriaMetrics"
+
+    # ConfigMap label + value used by the Grafana sidecar for auto-discovery.
+    # Must match your Grafana sidecar.dashboards.label / labelValue settings.
+    dashboardLabel: "grafana_dashboard"
+    dashboardLabelValue: "1"
 
 # ── Vector (telemetry pipeline agent) ─────────────────────────────────────────
-# Lightweight Rust data pipeline: Redpanda → VRL transform → InfluxDB v2.
+# Lightweight Rust data pipeline: Redpanda → VRL transform → VictoriaMetrics.
 # Deployed as a Kubernetes Deployment with a ConfigMap-mounted vector.yaml.
 # No sub-chart — our templates in vector-configmap.yaml + vector-deployment.yaml.
 #
 # Requires at least one of: redpanda.enabled=true or redpanda.externalBrokers set.
-# AND: influxdb2.enabled=true or influxdb2.externalUrl set.
-# AND: influxdb2.adminUser.token set.
+# AND: victoriametrics.remoteWriteUrl must be set to the existing VM endpoint.
 
 vector:
   # Set true to deploy the Vector pipeline agent.
@@ -856,59 +857,3 @@ vector:
       cpu: 200m
       memory: 256Mi
 
-# ── Grafana (dashboards + alerting) ───────────────────────────────────────────
-# Pre-provisioned with an InfluxDB v2 datasource and the OptimACS heartbeat
-# dashboard.  Uses the grafana/grafana sub-chart's sidecar feature for
-# zero-touch datasource + dashboard loading.
-#
-# Quickstart:
-#   helm install optimacs ./charts/optimacs \
-#     --set grafana.enabled=true \
-#     --set grafana.adminPassword=<choose> \
-#     --set grafana.env.INFLUXDB_TOKEN=<same-as-influxdb2.adminUser.token>
-
-grafana:
-  # Set true to deploy a Grafana instance.
-  enabled: false
-
-  # Grafana admin password.  Required when grafana.enabled=true.
-  adminPassword: ""
-
-  # Environment variables injected into the Grafana pod.
-  # INFLUXDB_TOKEN is substituted via ${INFLUXDB_TOKEN} in the provisioned
-  # datasource ConfigMap (created by telemetry-grafana-configmaps.yaml).
-  env:
-    INFLUXDB_TOKEN: ""     # set to influxdb2.adminUser.token value
-    INFLUXDB_ORG: optimacs
-    INFLUXDB_BUCKET: telemetry
-
-  # ── Sidecar — auto-loads ConfigMaps with grafana_datasource/dashboard labels ─
-  sidecar:
-    datasources:
-      enabled: true
-      label: grafana_datasource
-      labelValue: "1"
-    dashboards:
-      enabled: true
-      label: grafana_dashboard
-      labelValue: "1"
-      folder: /var/lib/grafana/dashboards/optimacs
-
-  # ── grafana sub-chart overrides ───────────────────────────────────────────
-  # Full parameter reference: https://github.com/grafana/helm-charts/tree/main/charts/grafana
-  service:
-    type: ClusterIP
-    port: 3000
-
-  persistence:
-    enabled: true
-    size: 5Gi
-    storageClass: ""
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi

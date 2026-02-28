@@ -1,67 +1,48 @@
-{{- if .Values.grafana.enabled }}
-{{- $influxdbUrl := include "optimacs.telemetry.influxdb.url" . }}
-# ── Grafana datasource ConfigMap ──────────────────────────────────────────────
-# Labelled with grafana_datasource=1 so the grafana sidecar auto-loads it.
-# ${INFLUXDB_TOKEN}, ${INFLUXDB_ORG}, and ${INFLUXDB_BUCKET} are substituted
-# by Grafana at startup from the pod environment (set via grafana.env.*).
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "ac-server.fullname" . }}-grafana-datasource
-  labels:
-    {{- include "ac-server.labels" . | nindent 4 }}
-    grafana_datasource: "1"
-data:
-  influxdb-telemetry.yaml: |
-    apiVersion: 1
-    datasources:
-      - name: InfluxDB-Telemetry
-        type: influxdb
-        access: proxy
-        url: {{ $influxdbUrl | default "http://influxdb:8086" }}
-        isDefault: true
-        editable: false
-        jsonData:
-          version: Flux
-          organization: "${INFLUXDB_ORG}"
-          defaultBucket: "${INFLUXDB_BUCKET}"
-          httpMode: POST
-        secureJsonData:
-          token: "${INFLUXDB_TOKEN}"
----
+{{- if .Values.vector.enabled }}
+{{- $vmUrl := include "optimacs.telemetry.victoriametrics.url" . }}
+{{- if $vmUrl }}
 # ── Grafana dashboard ConfigMap ───────────────────────────────────────────────
-# Labelled with grafana_dashboard=1 so the grafana sidecar auto-loads it.
-# Dashboard UID: optimacs-telemetry-v1
+# Labelled so the Grafana sidecar auto-loads it (no datasource CM needed —
+# the existing VictoriaMetrics datasource is already provisioned in Grafana).
+#
+# Datasource UID referenced below comes from:
+#   victoriametrics.grafana.datasourceUid  (default: "victoriametrics")
+#
+# To find your datasource UID:
+#   Grafana → Configuration → Data Sources → <your VictoriaMetrics ds> → copy
+#   the UID from the URL: /datasources/edit/<UID>
+#
+# Dashboard queries use PromQL — compatible with VictoriaMetrics and Prometheus.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "ac-server.fullname" . }}-grafana-dashboards
   labels:
     {{- include "ac-server.labels" . | nindent 4 }}
-    grafana_dashboard: "1"
+    {{ .Values.victoriametrics.grafana.dashboardLabel }}: {{ .Values.victoriametrics.grafana.dashboardLabelValue | quote }}
 data:
   optimacs-telemetry.json: |
     {
       "__inputs": [
         {
-          "name": "DS_INFLUXDB_TELEMETRY",
-          "label": "InfluxDB-Telemetry",
-          "description": "",
+          "name": "DS_VICTORIAMETRICS",
+          "label": {{ .Values.victoriametrics.grafana.datasourceName | quote }},
+          "description": "VictoriaMetrics / Prometheus datasource",
           "type": "datasource",
-          "pluginId": "influxdb",
-          "pluginName": "InfluxDB"
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
         }
       ],
       "__elements": {},
       "__requires": [
-        { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
-        { "type": "datasource", "id": "influxdb", "name": "InfluxDB", "version": "1.0.0" },
-        { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
-        { "type": "panel", "id": "table", "name": "Table", "version": "" },
-        { "type": "panel", "id": "stat", "name": "Stat", "version": "" }
+        { "type": "grafana",    "id": "grafana",     "name": "Grafana",     "version": "11.0.0" },
+        { "type": "datasource", "id": "prometheus",  "name": "Prometheus",  "version": "1.0.0"  },
+        { "type": "panel",      "id": "timeseries",  "name": "Time series", "version": ""       },
+        { "type": "panel",      "id": "table",       "name": "Table",       "version": ""       },
+        { "type": "panel",      "id": "stat",        "name": "Stat",        "version": ""       }
       ],
       "annotations": { "list": [] },
-      "description": "OptimACS device telemetry — heartbeat parameter changes and lifecycle events",
+      "description": "OptimACS device telemetry — heartbeat gauges and lifecycle events (VictoriaMetrics / PromQL)",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
@@ -76,7 +57,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -89,8 +70,9 @@ data:
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
             {
-              "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
-              "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"heartbeat\")\n  |> keep(columns: [\"mac\"])\n  |> distinct(column: \"mac\")\n  |> count()",
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "count(count by (mac) (optimacs_heartbeat_gauge))",
+              "legendFormat": "Devices",
               "refId": "A"
             }
           ],
@@ -98,7 +80,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
           "fieldConfig": {
             "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } },
             "overrides": []
@@ -108,16 +90,17 @@ data:
           "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
             {
-              "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
-              "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"heartbeat\")",
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "sum(increase(optimacs_device_events_total[$__range]))",
+              "legendFormat": "Events",
               "refId": "A"
             }
           ],
-          "title": "Heartbeat Events",
+          "title": "Lifecycle Events (Boot/OnBoard)",
           "type": "stat"
         },
         {
-          "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
           "fieldConfig": {
             "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } },
             "overrides": []
@@ -127,23 +110,72 @@ data:
           "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false }, "textMode": "auto" },
           "targets": [
             {
-              "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
-              "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"device_status\")",
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "sum(increase(optimacs_config_changes_total[$__range]))",
+              "legendFormat": "Changes",
               "refId": "A"
             }
           ],
-          "title": "Lifecycle Events (Boot/OnBoard)",
+          "title": "Config Changes Applied",
           "type": "stat"
         },
         {
           "collapsed": false,
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
           "id": 11,
-          "title": "Heartbeat — Parameter Changes",
+          "title": "Heartbeat — Device Parameters",
           "type": "row"
         },
         {
-          "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "auto", "spanNulls": false },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 4,
+          "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "optimacs_heartbeat_gauge{param_path=~\".*[Uu]p[Tt]ime.*\"}",
+              "legendFormat": "{{`{{mac}}`}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Device Uptime",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "auto", "spanNulls": false },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 5,
+          "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "optimacs_heartbeat_gauge{param_path=~\".*[Ff]ree[Mm]em.*|.*[Mm]emory[Ff]ree.*\"}",
+              "legendFormat": "{{`{{mac}}`}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Device Free Memory",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -151,58 +183,108 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 6 },
-          "id": 4,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "id": 6,
           "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
           "targets": [
             {
-              "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
-              "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"heartbeat\")\n  |> filter(fn: (r) => r[\"param_path\"] =~ /Device.DeviceInfo/)\n  |> group(columns: [\"mac\", \"param_path\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "optimacs_heartbeat_gauge{param_path=~\".*[Ll]oad[Aa]verage.*|.*[Ll]oad.*\"}",
+              "legendFormat": "{{`{{mac}}`}}",
               "refId": "A"
             }
           ],
-          "title": "Device Info Parameters — by Device",
+          "title": "Device Load Average",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "showPoints": "auto", "spanNulls": false },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "id": 7,
+          "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "optimacs_heartbeat_gauge{param_path=~\".*[Aa]ssociated[Dd]evice[Nn]umber.*|.*[Uu]sers.*\"}",
+              "legendFormat": "{{`{{mac}}`}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Connected WiFi Clients",
           "type": "timeseries"
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
           "id": 12,
           "title": "Device Lifecycle Events",
           "type": "row"
         },
         {
-          "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
           "fieldConfig": {
-            "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } },
-            "overrides": [
-              { "matcher": { "id": "byName", "options": "_time" }, "properties": [ { "id": "displayName", "value": "Time" }, { "id": "custom.width", "value": 180 } ] },
-              { "matcher": { "id": "byName", "options": "mac" }, "properties": [ { "id": "displayName", "value": "Device MAC" }, { "id": "custom.width", "value": 160 } ] }
-            ]
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }
+            },
+            "overrides": []
           },
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
-          "id": 5,
-          "options": { "cellHeight": "sm", "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true, "sortBy": [ { "desc": true, "displayName": "Time" } ] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "id": 8,
+          "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
           "targets": [
             {
-              "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB_TELEMETRY}" },
-              "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"device_status\")\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 200)",
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "sum by (event) (increase(optimacs_device_events_total[$__rate_interval]))",
+              "legendFormat": "{{`{{event}}`}}",
               "refId": "A"
             }
           ],
-          "title": "Recent Lifecycle Events",
-          "type": "table"
+          "title": "Lifecycle Events Rate (by type)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "id": 9,
+          "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": {{ .Values.victoriametrics.grafana.datasourceUid | quote }} },
+              "expr": "sum by (mac) (increase(optimacs_config_changes_total[$__rate_interval]))",
+              "legendFormat": "{{`{{mac}}`}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Config Changes Rate (by device)",
+          "type": "timeseries"
         }
       ],
       "refresh": "30s",
       "schemaVersion": 39,
-      "tags": ["optimacs", "telemetry", "usp"],
+      "tags": ["optimacs", "telemetry", "usp", "victoriametrics"],
       "templating": { "list": [] },
       "time": { "from": "now-6h", "to": "now" },
       "timepicker": {},
       "timezone": "browser",
-      "title": "OptimACS — Device Telemetry",
-      "uid": "optimacs-telemetry-v1",
+      "title": "OptimACS — Device Telemetry (VictoriaMetrics)",
+      "uid": "optimacs-telemetry-v2",
       "version": 1
     }
+{{- end }}
 {{- end }}

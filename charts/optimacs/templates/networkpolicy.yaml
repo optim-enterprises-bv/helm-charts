@@ -2,6 +2,7 @@
 # ── ac-server NetworkPolicy ───────────────────────────────────────────────────
 # Ingress: ACP protocol port from any source (access points are external).
 # Egress: MySQL, optional Redis, optional Redpanda (telemetry), optional step-ca.
+# Vector gets its own policy below (egress: Redpanda 9092 + VictoriaMetrics 8428).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -49,6 +50,48 @@ spec:
         - port: 53
           protocol: TCP
 ---
+{{- if .Values.vector.enabled }}
+{{- $vmUrl := include "optimacs.telemetry.victoriametrics.url" . }}
+{{- if $vmUrl }}
+# ── Vector NetworkPolicy ──────────────────────────────────────────────────────
+# Ingress: none (Vector is a push-only agent).
+# Egress:  Redpanda Kafka listener + VictoriaMetrics remote-write endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "optimacs.vector.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vector
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ac-server.name" . }}-vector
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # Redpanda / Kafka — consume telemetry topics
+    - ports:
+        - port: 9092
+          protocol: TCP
+        - port: 9093
+          protocol: TCP
+    # VictoriaMetrics remote-write (default port 8428)
+    - ports:
+        - port: 8428
+          protocol: TCP
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+{{- end }}
+{{- end }}
 {{- if .Values.ui.enabled }}
 # ── optimacs-ui NetworkPolicy ─────────────────────────────────────────────────
 # Ingress: HTTP from cluster (Ingress controller or internal calls).

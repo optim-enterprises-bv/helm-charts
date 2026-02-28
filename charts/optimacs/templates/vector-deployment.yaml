@@ -1,9 +1,9 @@
 {{- if .Values.vector.enabled }}
 {{- $redpandaBrokers := include "optimacs.telemetry.redpanda.brokers" . }}
-{{- $influxdbUrl     := include "optimacs.telemetry.influxdb.url" . }}
-{{- if and $redpandaBrokers $influxdbUrl }}
+{{- $vmUrl           := include "optimacs.telemetry.victoriametrics.url" . }}
+{{- if and $redpandaBrokers $vmUrl }}
 # Vector telemetry pipeline Deployment.
-# Consumes Redpanda topics and forwards processed events to InfluxDB v2.
+# Consumes Redpanda topics and forwards Prometheus metrics to VictoriaMetrics.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
