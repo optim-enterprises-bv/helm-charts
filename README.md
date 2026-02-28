@@ -22,6 +22,7 @@ OptimACS provides centralized provisioning, configuration delivery, firmware man
    - [EMQX MQTT Broker](#emqx-mqtt-broker)
    - [MySQL Cluster](#mysql-cluster)
    - [Redis Cache](#redis-cache)
+   - [Telemetry Pipeline](#telemetry-pipeline)
    - [Autoscaling (HPA)](#autoscaling-hpa)
    - [Network Policy](#network-policy)
    - [Prometheus Metrics](#prometheus-metrics)
@@ -34,13 +35,13 @@ OptimACS provides centralized provisioning, configuration delivery, firmware man
 
 ## Architecture
 
-![OptimACS System Architecture](https://raw.githubusercontent.com/optim-enterprises-bv/APConfig/main/docs/images/architecture.png)
+![OptimACS System Architecture](https://raw.githubusercontent.com/optim-enterprises-bv/APConfig/main/docs/images/architecture.svg)
 
 ---
 
 ## Components
 
-**ac-server** — Rust async (tokio + rustls) USP Controller. Handles device provisioning, TR-181 GET/SET/OPERATE dispatch, firmware streaming, and telemetry ingestion. Delegates all X.509 certificate signing to step-ca via the JWK provisioner REST API. Post-quantum hybrid TLS (X25519 + ML-KEM-768).
+**ac-server** — Rust async (tokio + rustls) USP Controller. Handles device provisioning, TR-181 GET/SET/OPERATE dispatch, firmware streaming, and telemetry ingestion. Publishes USP events to Redpanda via `rdkafka`. Delegates all X.509 certificate signing to step-ca via the JWK provisioner REST API. Post-quantum hybrid TLS (X25519 + ML-KEM-768).
 
 **step-ca** — Smallstep Certificate Authority (PKI). Issues all X.509 certificates in the stack: server TLS cert, per-device client certs, and the init cert. ac-server authenticates CSR signing requests using an EC P-256 JWK provisioner key; the CA private key never leaves the step-ca container.
 
@@ -50,14 +51,26 @@ OptimACS provides centralized provisioning, configuration delivery, firmware man
 
 **EMQX** — MQTT 5 broker for the MQTT Message Transport Protocol (MTP). Agents publish USP Records to controller topics; controller subscribes per-agent.
 
-| Component | Image | Port(s) |
-|-----------|-------|---------|
-| ac-server | `ghcr.io/optim-enterprises-bv/ac-server` | `3491` WSS (USP WebSocket MTP) |
-| optimacs-ui | `ghcr.io/optim-enterprises-bv/optimacs-ui` | `8080` HTTP |
-| EMQX | `emqx/emqx:5` | `1883` MQTT · `8883` MQTTS · `18083` Dashboard |
-| MariaDB/MySQL | `bitnami/mysql` | `3306` |
-| Redis | `bitnami/redis` | `6379` |
-| step-ca | `smallstep/step-certificates` | `9000` HTTPS |
+**Redpanda** *(optional)* — Kafka-compatible streaming broker (no ZooKeeper). Receives USP events published by ac-server on topics `optimacs.heartbeat`, `optimacs.device.status`, and `optimacs.config.change`.
+
+**Vector** *(optional)* — Rust telemetry pipeline agent. Consumes Redpanda topics, enriches events via VRL transforms, and writes measurements to InfluxDB v2.
+
+**InfluxDB v2** *(optional)* — Time-series database for device telemetry. Stores `heartbeat`, `device_status`, and `telemetry_event` measurements.
+
+**Grafana** *(optional)* — Dashboards and alerting. Auto-provisioned via ConfigMap sidecar with the InfluxDB-Telemetry datasource and the "OptimACS — Device Telemetry" dashboard.
+
+| Component | Image | Port(s) | Chart key |
+|-----------|-------|---------|-----------|
+| ac-server | `ghcr.io/optim-enterprises-bv/ac-server` | `3491` WSS (USP WebSocket MTP) | *(core)* |
+| optimacs-ui | `ghcr.io/optim-enterprises-bv/optimacs-ui` | `8080` HTTP | `ui.enabled` |
+| EMQX | `emqx/emqx:5` | `1883` MQTT · `8883` MQTTS · `18083` Dashboard | `emqx.enabled` |
+| MariaDB/MySQL | `bitnami/mysql` | `3306` | `mysql.enabled` |
+| Redis | `bitnami/redis` | `6379` | `redis.enabled` |
+| step-ca | `smallstep/step-certificates` | `9000` HTTPS | `stepca.enabled` |
+| Redpanda | `redpandadata/redpanda` | `9092` Kafka · `9644` Admin | `redpanda.enabled` |
+| Vector | `timberio/vector:0.41.1-alpine` | — (internal) | `vector.enabled` |
+| InfluxDB v2 | `influxdb:2` | `8086` HTTP | `influxdb2.enabled` |
+| Grafana | `grafana/grafana` | `3000` HTTP | `grafana.enabled` |
 
 ---
 
@@ -114,7 +127,7 @@ helm repo update
 
 | Chart | Version | Description |
 |-------|---------|-------------|
-| `optimacs/optimacs` | 0.4.0 | Full OptimACS stack — ac-server, optimacs-ui, EMQX, MySQL, Redis, step-ca |
+| `optimacs/optimacs` | 0.6.0 | Full OptimACS stack — ac-server, optimacs-ui, EMQX, MySQL, Redis (cluster), step-ca + optional telemetry pipeline (Redpanda, Vector, InfluxDB v2, Grafana) |
 
 ```sh
 helm search repo optimacs
@@ -168,6 +181,25 @@ helm install optimacs optimacs/optimacs \
   --set db.password=dev \
   --set mysql.auth.rootPassword=devroot \
   --set ui.secretKey=devsecret
+```
+
+### With telemetry pipeline
+
+Enable the full Redpanda → Vector → InfluxDB v2 → Grafana pipeline:
+
+```sh
+helm install optimacs optimacs/optimacs \
+  --namespace optimacs --create-namespace \
+  --set db.password=<pass> \
+  --set mysql.auth.rootPassword=<root-pass> \
+  --set ui.secretKey=<key> \
+  --set redpanda.enabled=true \
+  --set influxdb2.enabled=true \
+  --set influxdb2.adminUser.token=<influx-token> \
+  --set influxdb2.adminUser.password=<influx-password> \
+  --set vector.enabled=true \
+  --set grafana.enabled=true \
+  --set grafana.adminPassword=<grafana-password>
 ```
 
 ---
@@ -320,6 +352,85 @@ helm install optimacs optimacs/optimacs \
 
 > **Note**: Redis is **required** for horizontal scaling (`replicaCount > 1`). It acts as a shared endpoint registry so agent MAC addresses are visible across all ac-server replicas.
 
+### Telemetry Pipeline
+
+The telemetry pipeline is fully opt-in.  All four components can be enabled independently:
+
+```sh
+helm upgrade optimacs optimacs/optimacs \
+  --set redpanda.enabled=true \
+  --set influxdb2.enabled=true \
+  --set influxdb2.adminUser.token=<token> \
+  --set influxdb2.adminUser.password=<password> \
+  --set vector.enabled=true \
+  --set grafana.enabled=true \
+  --set grafana.adminPassword=<password> \
+  --set db.password=<pass> \
+  --set mysql.auth.rootPassword=<root-pass> \
+  --set ui.secretKey=<key>
+```
+
+#### Redpanda
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `redpanda.enabled` | `false` | Deploy in-cluster Redpanda sub-chart |
+| `redpanda.externalBrokers` | `""` | External broker address (e.g. `broker.example.com:9092`) — overrides sub-chart |
+
+When `redpanda.enabled=true` the chart automatically sets `redpanda_brokers` in the ac-server config Secret and opens Redpanda egress (9092/9093) in the NetworkPolicy.
+
+#### InfluxDB v2
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `influxdb2.enabled` | `false` | Deploy InfluxDB v2 sub-chart |
+| `influxdb2.externalUrl` | `""` | External InfluxDB URL (e.g. `https://influx.example.com`) |
+| `influxdb2.adminUser.token` | `""` | API token — **required** |
+| `influxdb2.adminUser.password` | `""` | Admin password — **required** |
+| `influxdb2.adminUser.organization` | `optimacs` | Organisation name |
+| `influxdb2.adminUser.bucket` | `telemetry` | Target bucket |
+| `influxdb2.adminUser.retentionPolicy` | `30d` | Data retention period |
+| `influxdb2.persistence.enabled` | `true` | Persist InfluxDB data |
+| `influxdb2.persistence.size` | `10Gi` | PVC size |
+
+#### Vector
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `vector.enabled` | `false` | Deploy Vector pipeline (requires Redpanda + InfluxDB both reachable) |
+| `vector.image.repository` | `timberio/vector` | Vector image |
+| `vector.image.tag` | `0.41.1-alpine` | Vector image tag |
+
+Vector is deployed as a single-replica Deployment.  Its `vector.yaml` ConfigMap is rendered by the Helm chart using `optimacs.telemetry.redpanda.brokers` and `optimacs.telemetry.influxdb.url` helpers — no manual URL configuration required.
+
+#### Grafana
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `grafana.enabled` | `false` | Deploy Grafana sub-chart with pre-provisioned dashboard |
+| `grafana.adminPassword` | `""` | Grafana admin password — **required** |
+
+The datasource and dashboard are auto-loaded by the Grafana sidecar container from ConfigMaps labelled `grafana_datasource: "1"` and `grafana_dashboard: "1"`.
+
+#### Using an external Redpanda or InfluxDB
+
+```sh
+# External Redpanda cluster
+helm upgrade optimacs optimacs/optimacs \
+  --set redpanda.externalBrokers=broker1.example.com:9092 \
+  --set influxdb2.enabled=true \
+  --set vector.enabled=true \
+  ...
+
+# External InfluxDB Cloud
+helm upgrade optimacs optimacs/optimacs \
+  --set influxdb2.externalUrl=https://us-east-1-1.aws.cloud2.influxdata.com \
+  --set influxdb2.adminUser.token=<cloud-token> \
+  --set redpanda.enabled=true \
+  --set vector.enabled=true \
+  ...
+```
+
 ### Autoscaling (HPA)
 
 ```sh
@@ -346,7 +457,7 @@ helm upgrade optimacs optimacs/optimacs \
 
 When `networkPolicy.enabled=true`:
 - **Ingress** — only on the declared service ports (3491 WSS for ac-server, 8080 for UI) and the optional metrics port.
-- **Egress** — only to MySQL (3306), Redis (6379), EMQX (1883/8883), step-ca (9000), and DNS (53). All other egress is blocked.
+- **Egress** — only to MySQL (3306), Redis (6379), EMQX (1883/8883), step-ca (9000), Redpanda (9092/9093, when `redpanda.enabled=true` or `redpanda.externalBrokers` is set), and DNS (53). All other egress is blocked.
 
 ```sh
 helm upgrade optimacs optimacs/optimacs \
