@@ -99,6 +99,50 @@ Check cluster status:
 {{- end }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Telemetry pipeline
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if or .Values.redpanda.enabled .Values.redpanda.externalBrokers }}
+
+Redpanda brokers : {{ include "optimacs.telemetry.redpanda.brokers" . }}
+Topics:
+  optimacs.heartbeat     — ValueChange parameter events    (4 partitions)
+  optimacs.device.status — Boot! / OnBoardRequest events   (2 partitions)
+  optimacs.config.change — config-push confirmations       (2 partitions)
+
+Topics are created automatically by the redpanda-init Job on first start.
+{{- else }}
+
+  Telemetry disabled — set redpanda.enabled=true or redpanda.externalBrokers
+  to start publishing USP events to Redpanda.
+{{- end }}
+{{- if or .Values.influxdb2.enabled .Values.influxdb2.externalUrl }}
+
+InfluxDB v2 : {{ include "optimacs.telemetry.influxdb.url" . }}
+Org         : {{ .Values.influxdb2.adminUser.organization }}
+Bucket      : {{ .Values.influxdb2.adminUser.bucket }}
+Retention   : {{ .Values.influxdb2.adminUser.retentionPolicy }}
+
+  Port-forward to access the InfluxDB UI:
+    kubectl port-forward svc/{{ .Release.Name }}-influxdb2 8086:8086 \
+      --namespace {{ .Release.Namespace }}
+  Then open: http://localhost:8086
+{{- end }}
+{{- if .Values.vector.enabled }}
+
+Vector pipeline is running — consuming Redpanda topics → InfluxDB v2.
+  kubectl logs -l app.kubernetes.io/name={{ include "optimacs.vector.fullname" . }} \
+    --namespace {{ .Release.Namespace }} --tail=50
+{{- end }}
+{{- if .Values.grafana.enabled }}
+
+Grafana (InfluxDB datasource + OptimACS dashboard pre-provisioned):
+  Port-forward:
+    kubectl port-forward svc/{{ .Release.Name }}-grafana 3000:3000 \
+      --namespace {{ .Release.Namespace }}
+  Then open: http://localhost:3000  (admin / {{ .Values.grafana.adminPassword | default "<GRAFANA_PASSWORD>" }})
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  Security notes
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • TLS 1.3 only — hybrid X25519+ML-KEM-768 key exchange (NIST FIPS 203).

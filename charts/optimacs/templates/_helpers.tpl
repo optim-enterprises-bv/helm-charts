@@ -151,12 +151,6 @@ Redis helpers
 
 {{/*
 Redis connection URL.
-When the embedded Redis sub-chart is enabled this resolves to the bitnami/redis
-master service URL.  For an external Redis instance the operator must set
-redis.url directly.  Returns an empty string when Redis is disabled.
-*/}}
-{{/*
-Redis connection URL.
 When the embedded Redis sub-chart is enabled (architecture: replication) this
 resolves to the bitnami/redis primary (master) service, which Sentinel keeps
 updated after any failover — no URL change required.
@@ -169,4 +163,47 @@ Returns an empty string when Redis is disabled.
 {{- else -}}
 {{- .Values.redis.url }}
 {{- end }}
+{{- end }}
+
+{{/*
+──────────────────────────────────────────────────────────────────────────────
+Telemetry pipeline helpers
+──────────────────────────────────────────────────────────────────────────────
+*/}}
+
+{{/*
+Redpanda broker bootstrap address.
+When the embedded Redpanda sub-chart is enabled this resolves to the in-cluster
+Kafka listener (<release>-redpanda:9092).
+For an external broker supply redpanda.externalBrokers (comma-separated).
+Returns an empty string when both are unset — ac-server disables telemetry.
+*/}}
+{{- define "optimacs.telemetry.redpanda.brokers" -}}
+{{- if .Values.redpanda.enabled -}}
+{{- printf "%s-redpanda:9092" .Release.Name }}
+{{- else -}}
+{{- .Values.redpanda.externalBrokers }}
+{{- end }}
+{{- end }}
+
+{{/*
+InfluxDB v2 endpoint URL.
+When the embedded InfluxDB v2 sub-chart is enabled this resolves to the
+in-cluster service (<release>-influxdb2:8086).
+For an external instance supply influxdb2.externalUrl.
+Returns an empty string when both are unset.
+*/}}
+{{- define "optimacs.telemetry.influxdb.url" -}}
+{{- if .Values.influxdb2.enabled -}}
+{{- printf "http://%s-influxdb2:8086" .Release.Name }}
+{{- else -}}
+{{- .Values.influxdb2.externalUrl }}
+{{- end }}
+{{- end }}
+
+{{/*
+Vector deployment fullname.
+*/}}
+{{- define "optimacs.vector.fullname" -}}
+{{- printf "%s-vector" (include "ac-server.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}

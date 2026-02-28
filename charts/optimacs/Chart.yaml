@@ -2,11 +2,12 @@ apiVersion: v2
 name: optimacs
 description: |
   Full OptimACS stack — USP Controller (TR-369/ac-server), management web UI
-  (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster, and
-  Smallstep step-ca PKI for certificate lifecycle management.
+  (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster,
+  Smallstep step-ca PKI for certificate lifecycle management, and an optional
+  streaming telemetry pipeline (Redpanda + Vector + InfluxDB v2 + Grafana).
 type: application
-version: 0.5.0
-appVersion: "0.5.0"
+version: 0.6.0
+appVersion: "0.6.0"
 keywords:
   - usp
   - tr-369
@@ -51,3 +52,30 @@ dependencies:
     version: ">=1.0.0"
     repository: https://smallstep.github.io/helm-charts
     condition: stepca.enabled
+
+  # ── Telemetry pipeline (all optional — disabled by default) ───────────────
+
+  # Redpanda — Kafka-compatible event broker for USP telemetry streaming.
+  # ac-server publishes Boot!/ValueChange events; Vector consumes and forwards.
+  # Set redpanda.enabled=true and supply a storage class for production.
+  # Full chart reference: https://github.com/redpanda-data/helm-charts
+  - name: redpanda
+    version: ">=5.0.0"
+    repository: https://charts.redpanda.com
+    condition: redpanda.enabled
+
+  # InfluxDB v2 — purpose-built time-series store for device telemetry.
+  # Set influxdb2.enabled=true; supply adminUser.token for Vector + Grafana.
+  # Full chart reference: https://github.com/influxdata/helm-charts
+  - name: influxdb2
+    version: ">=2.0.0"
+    repository: https://helm.influxdata.com/
+    condition: influxdb2.enabled
+
+  # Grafana — dashboards and alerting on top of InfluxDB telemetry data.
+  # Datasource + starter dashboard are provisioned automatically via sidecars.
+  # Full chart reference: https://github.com/grafana/helm-charts
+  - name: grafana
+    version: ">=8.0.0"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled

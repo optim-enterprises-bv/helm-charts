@@ -1,0 +1,57 @@
+{{- if .Values.vector.enabled }}
+{{- $redpandaBrokers := include "optimacs.telemetry.redpanda.brokers" . }}
+{{- $influxdbUrl     := include "optimacs.telemetry.influxdb.url" . }}
+{{- if and $redpandaBrokers $influxdbUrl }}
+# Vector telemetry pipeline Deployment.
+# Consumes Redpanda topics and forwards processed events to InfluxDB v2.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "optimacs.vector.fullname" . }}
+  labels:
+    {{- include "ac-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ac-server.name" . }}-vector
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "ac-server.name" . }}-vector
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: vector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534   # nobody
+      containers:
+        - name: vector
+          image: "{{ .Values.vector.image.repository }}:{{ .Values.vector.image.tag }}"
+          imagePullPolicy: {{ .Values.vector.image.pullPolicy }}
+          args:
+            - "--config"
+            - "/etc/vector/vector.yaml"
+          resources:
+            {{- toYaml .Values.vector.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vector
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/vector
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "optimacs.vector.fullname" . }}-config
+        - name: data
+          emptyDir: {}
+{{- end }}
+{{- end }}
