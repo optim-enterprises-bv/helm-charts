@@ -1,0 +1,18 @@
+{{- if .Values.databunker.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "optimacs.databunker.fullname" . }}
+  labels:
+    {{- include "optimacs.databunker.labels" . | nindent 4 }}
+spec:
+  # ClusterIP only — Databunker must never be reachable from outside the cluster.
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.databunker.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "optimacs.databunker.selectorLabels" . | nindent 4 }}
+{{- end }}

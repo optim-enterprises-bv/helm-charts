@@ -95,7 +95,7 @@ spec:
 {{- if .Values.ui.enabled }}
 # ── optimacs-ui NetworkPolicy ─────────────────────────────────────────────────
 # Ingress: HTTP from cluster (Ingress controller or internal calls).
-# Egress: MySQL only, plus DNS and optional Redis.
+# Egress: MySQL, optional Redis, Databunker PII vault, and DNS.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -122,7 +122,52 @@ spec:
         - port: 6379
           protocol: TCP
     {{- end }}
+    {{- if .Values.databunker.enabled }}
+    # Databunker PII vault — only optimacs-ui is permitted to reach it
+    - ports:
+        - port: {{ .Values.databunker.port }}
+          protocol: TCP
+      podSelector:
+        matchLabels:
+          {{- include "optimacs.databunker.selectorLabels" . | nindent 10 }}
+    {{- end }}
     # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}
+---
+{{- if .Values.databunker.enabled }}
+# ── databunker NetworkPolicy ──────────────────────────────────────────────────
+# Ingress: only from optimacs-ui pods (no external access).
+# Egress: DNS only (Databunker does not call any external service).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "optimacs.databunker.fullname" . }}
+  labels:
+    {{- include "optimacs.databunker.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "optimacs.databunker.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: {{ .Values.databunker.port }}
+          protocol: TCP
+      {{- if .Values.ui.enabled }}
+      from:
+        - podSelector:
+            matchLabels:
+              {{- include "optimacs.ui.selectorLabels" . | nindent 14 }}
+      {{- end }}
+  egress:
+    # DNS only
     - ports:
         - port: 53
           protocol: UDP

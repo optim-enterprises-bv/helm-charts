@@ -146,9 +146,41 @@ Vector pipeline : running
 {{- end }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Databunker PII vault
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.databunker.enabled }}
+
+  Databunker is deployed and stores all PII (customer profiles, billing
+  addresses, payment tokens) with AES-256 per-record encryption, isolated
+  from the operational MySQL database.
+
+  Internal service URL (used by optimacs-ui automatically):
+    http://{{ include "optimacs.databunker.fullname" . }}:{{ .Values.databunker.port }}
+
+  ⚠ DATABUNKER_MASTERKEY is stored in:
+      kubectl get secret {{ include "optimacs.databunker.secretName" . }} \
+        -n {{ .Release.Namespace }}
+
+    LOSING THIS KEY MAKES ALL PII RECORDS PERMANENTLY UNRECOVERABLE.
+    Back it up to a secure secrets manager (Vault, AWS Secrets Manager, etc.)
+    immediately.
+
+{{- else }}
+
+  databunker.enabled=false — the UI will connect to the external Databunker
+  instance at: {{ .Values.databunker.url | default "(databunker.url not set)" }}
+
+  Ensure databunker.rootToken is set correctly so DATABUNKER_ROOT_TOKEN is
+  injected into the UI Secret.
+
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  Security notes
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • TLS 1.3 only — hybrid X25519+ML-KEM-768 key exchange (NIST FIPS 203).
 • DB password stored in a Kubernetes Secret, not a ConfigMap.
 • Containers run as non-root (UID 1000).
 • ac-server has a read-only root filesystem.
+• PII vault (Databunker) uses AES-256 per-record encryption; operational DB
+  holds only a numeric tenant ID — a DB dump contains no plaintext PII.
