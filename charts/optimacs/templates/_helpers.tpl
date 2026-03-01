@@ -167,6 +167,51 @@ Returns an empty string when Redis is disabled.
 
 {{/*
 ──────────────────────────────────────────────────────────────────────────────
+Databunker PII vault helpers
+──────────────────────────────────────────────────────────────────────────────
+*/}}
+
+{{- define "optimacs.databunker.fullname" -}}
+{{- printf "%s-databunker" (include "ac-server.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "optimacs.databunker.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ac-server.name" . }}-databunker
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "optimacs.databunker.labels" -}}
+helm.sh/chart: {{ include "ac-server.chart" . }}
+{{ include "optimacs.databunker.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{- define "optimacs.databunker.secretName" -}}
+{{- printf "%s-databunker-secret" (include "ac-server.fullname" .) }}
+{{- end }}
+
+{{- define "optimacs.databunker.pvcName" -}}
+{{- printf "%s-databunker-data" (include "ac-server.fullname" .) }}
+{{- end }}
+
+{{/*
+Internal URL at which optimacs-ui reaches Databunker.
+When databunker.enabled=true this resolves to the in-cluster ClusterIP service.
+Set databunker.enabled=false and databunker.url for an external instance.
+*/}}
+{{- define "optimacs.databunker.url" -}}
+{{- if .Values.databunker.enabled -}}
+{{- printf "http://%s:%d" (include "optimacs.databunker.fullname" .) (int .Values.databunker.port) }}
+{{- else -}}
+{{- .Values.databunker.url | default "" }}
+{{- end }}
+{{- end }}
+
+{{/*
+──────────────────────────────────────────────────────────────────────────────
 Telemetry pipeline helpers
 ──────────────────────────────────────────────────────────────────────────────
 */}}

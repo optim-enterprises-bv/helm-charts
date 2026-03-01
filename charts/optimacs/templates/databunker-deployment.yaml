@@ -1,0 +1,103 @@
+{{- if .Values.databunker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "optimacs.databunker.fullname" . }}
+  labels:
+    {{- include "optimacs.databunker.labels" . | nindent 4 }}
+spec:
+  # Databunker stores its SQLite database on a PVC — only one replica is
+  # supported unless a ReadWriteMany storage class is configured.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "optimacs.databunker.selectorLabels" . | nindent 6 }}
+  strategy:
+    # Recreate avoids two pods fighting over the PVC on upgrade.
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        # Roll Databunker pod when its Secret changes.
+        checksum/secret: {{ include (print $.Template.BasePath "/databunker-secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "optimacs.databunker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: databunker
+          image: "{{ .Values.databunker.image.repository }}:{{ .Values.databunker.image.tag }}"
+          imagePullPolicy: {{ .Values.databunker.image.pullPolicy }}
+
+          {{- with .Values.databunker.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.databunker.port }}
+              protocol: TCP
+
+          env:
+            - name: DATABUNKER_MASTERKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optimacs.databunker.secretName" . }}
+                  key: DATABUNKER_MASTERKEY
+            - name: DATABUNKER_ROOTTOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optimacs.databunker.secretName" . }}
+                  key: DATABUNKER_ROOTTOKEN
+
+          livenessProbe:
+            httpGet:
+              path: /v1/status
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /v1/status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          volumeMounts:
+            # Mount only /databunker/data (the write path).
+            # The image ships this directory pre-owned by appuser (UID 100),
+            # so Docker/Kubernetes initialises the PVC with correct ownership.
+            # /databunker/bin, /conf, and /certs remain from the image layer.
+            - name: databunker-data
+              mountPath: /databunker/data
+
+          {{- with .Values.databunker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      volumes:
+        - name: databunker-data
+          persistentVolumeClaim:
+            claimName: {{ include "optimacs.databunker.pvcName" . }}
+
+      {{- with .Values.databunker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databunker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.databunker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

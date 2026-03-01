@@ -13,8 +13,12 @@ spec:
   template:
     metadata:
       annotations:
-        # Roll UI pods when the Secret (DATABASE_URL / SECRET_KEY) changes
+        # Roll UI pods when the UI Secret (DATABASE_URL / SECRET_KEY / DATABUNKER_*) changes
         checksum/secret: {{ include (print $.Template.BasePath "/ui-secret.yaml") . | sha256sum }}
+        {{- if .Values.databunker.enabled }}
+        # Also roll when the Databunker vault secret changes
+        checksum/databunker-secret: {{ include (print $.Template.BasePath "/databunker-secret.yaml") . | sha256sum }}
+        {{- end }}
       labels:
         {{- include "optimacs.ui.selectorLabels" . | nindent 8 }}
     spec:

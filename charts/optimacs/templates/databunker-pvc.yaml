@@ -1,0 +1,17 @@
+{{- if .Values.databunker.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "optimacs.databunker.pvcName" . }}
+  labels:
+    {{- include "optimacs.databunker.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.databunker.persistence.accessMode | quote }}
+  {{- if .Values.databunker.persistence.storageClass }}
+  storageClassName: {{ .Values.databunker.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.databunker.persistence.size | quote }}
+{{- end }}

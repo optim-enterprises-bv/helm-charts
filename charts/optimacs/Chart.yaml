@@ -3,13 +3,12 @@ name: optimacs
 description: |
   Full OptimACS stack — USP Controller (TR-369/ac-server), management web UI
   (FastAPI + GraphQL), EMQX MQTT broker, MySQL replication cluster,
-  Smallstep step-ca PKI for certificate lifecycle management, and an optional
-  streaming telemetry pipeline (Redpanda → Vector → VictoriaMetrics).
-  Integrates with an existing VictoriaMetrics stack via Prometheus remote-write;
-  no standalone InfluxDB or Grafana sub-charts required.
+  Smallstep step-ca PKI for certificate lifecycle management, an optional
+  streaming telemetry pipeline (Redpanda → Vector → VictoriaMetrics), and
+  Databunker AES-256-encrypted PII vault.
 type: application
-version: 0.6.0
-appVersion: "0.6.0"
+version: 0.7.0
+appVersion: "0.7.0"
 keywords:
   - usp
   - tr-369

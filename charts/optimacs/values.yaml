@@ -156,6 +156,66 @@ ui:
   tolerations: []
   affinity: {}
 
+# ── Databunker PII vault ──────────────────────────────────────────────────────
+# Databunker stores all PII (customer profiles, billing addresses, payment
+# method tokens) with AES-256 per-record encryption, completely isolated from
+# the operational MySQL database.  optimacs-ui is the only service that talks
+# to Databunker; no other pod has egress to its port.
+#
+# Set databunker.enabled=false and supply databunker.url + databunker.rootToken
+# to use an existing external Databunker instance instead.
+
+databunker:
+  enabled: true
+
+  image:
+    repository: securitybunker/databunker
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # 32-byte hex AES master key — REQUIRED when databunker.enabled=true.
+  # Loss of this key makes all PII records permanently unrecoverable.
+  # Generate: openssl rand -hex 32
+  masterKey: ""
+
+  # UUID root API token used by optimacs-ui to read/write vault records.
+  # Required when databunker.enabled=true.
+  # Generate: python3 -c "import uuid; print(uuid.uuid4())"
+  rootToken: ""
+
+  # Internal REST API port
+  port: 3000
+
+  # External Databunker URL — only used when databunker.enabled=false.
+  url: ""
+
+  persistence:
+    size: 1Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # NOTE: The Databunker image (appuser, UID 100) requires write access to
+  # /databunker/data.  The Deployment mounts the PVC only at /databunker/data
+  # so Docker/Kubernetes initialises the volume from the image's pre-owned
+  # directory (UID 100).  Do not set runAsNonRoot: true here — the image
+  # manages its own user internally.
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 # ── Horizontal Pod Autoscaler ─────────────────────────────────────────────────
 # When enabled, the HPA manages replica counts; set replicaCount / ui.replicaCount
 # to the desired minimum (the HPA minReplicas takes precedence at runtime).
