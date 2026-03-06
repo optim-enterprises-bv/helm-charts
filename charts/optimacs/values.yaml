@@ -102,18 +102,19 @@ securityContext:
   capabilities:
     drop: [ALL]
 
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
 
 # ── DatabunkerPro subchart configuration ─────────────────────────────────────
+# Configure DatabunkerPro to use external MySQL and Redis
 databunkerpro:
-  # Use existing MySQL instead of internal PostgreSQL
   database:
+    # Use external MySQL instead of internal PostgreSQL
     external: true
     type: mysql
     externalConfig:
-      host: "optimacs-mysql"
+      host: "optimacs-mysql.optimacs.svc.cluster.local"
       port: 3306
       database: "databunkerdb"
       user: "acserver"
@@ -131,7 +132,7 @@ databunkerpro:
     enabled: true
     external: true
     externalConfig:
-      host: "optimacs-redis-master"
+      host: "optimacs-redis-master.optimacs.svc.cluster.local"
       port: 6379
     internal:
       redis:
