@@ -1,0 +1,86 @@
+{{- if and .Values.redis.enabled (not .Values.redis.external) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-redis
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "databunkerpro.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "databunkerpro.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      containers:
+        - name: redis
+          image: "{{ .Values.redis.internal.image.repository }}:{{ .Values.redis.internal.image.tag }}"
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          command:
+            - /bin/sh
+            - -c
+            - |
+              redis-server --requirepass $$REDIS_USER_PASS
+          env:
+            - name: REDIS_USER_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "databunkerpro.fullname" . }}-redis
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.redis.internal.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.redis.internal.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "databunkerpro.fullname" . }}-redis
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-redis
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    {{- include "databunkerpro.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+{{- if .Values.redis.internal.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-redis
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.redis.internal.persistence.size }}
+{{- end }}
+{{- end }}

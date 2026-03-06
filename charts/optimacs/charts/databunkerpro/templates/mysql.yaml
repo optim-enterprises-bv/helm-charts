@@ -1,0 +1,128 @@
+{{- if and (not .Values.database.external) (eq .Values.database.type "mysql") (.Values.database.internal.mysql.enabled) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-mysql
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+spec:
+  serviceName: {{ include "databunkerpro.fullname" . }}-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "databunkerpro.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mysql
+  template:
+    metadata:
+      labels:
+        {{- include "databunkerpro.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mysql
+    spec:
+      initContainers:
+        - name: init-chown-data
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/run/mysqld
+              chown -R 999:999 /var/run/mysqld
+              chown -R 999:999 /var/lib/mysql
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: mysqld-run
+              mountPath: /var/run/mysqld
+      containers:
+        - name: mysql
+          image: "{{ .Values.database.internal.mysql.image.repository }}:{{ .Values.database.internal.mysql.image.tag }}"
+          resources:
+            {{- toYaml .Values.database.internal.mysql.resources | nindent 12 }}
+          args:
+            {{- toYaml .Values.database.internal.mysql.args | nindent 12 }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.database.internal.mysql.auth.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.database.internal.mysql.auth.username | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "databunkerpro.dbSecretName" . }}
+                  key: password
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "databunkerpro.dbSecretName" . }}
+                  key: root-password
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: mysqld-run
+              mountPath: /var/run/mysqld
+          resources:
+            {{- toYaml .Values.database.internal.mysql.resources | nindent 12 }}
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -u
+                - root
+                - -p${MYSQL_ROOT_PASSWORD}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+                - -u
+                - root
+                - -p${MYSQL_ROOT_PASSWORD}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: mysqld-run
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.database.internal.mysql.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-mysql
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+      targetPort: mysql
+      protocol: TCP
+      name: mysql
+  selector:
+    {{- include "databunkerpro.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+{{- end }} 

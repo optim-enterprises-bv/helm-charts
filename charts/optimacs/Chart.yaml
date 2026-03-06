@@ -70,3 +70,10 @@ dependencies:
   # Vector forwards metrics via Prometheus remote-write to the existing VM stack.
   # No sub-charts for InfluxDB or Grafana — set victoriametrics.remoteWriteUrl
   # in values.yaml to point at your cluster's VictoriaMetrics remote-write endpoint.
+
+  # DatabunkerPro — privacy vault and tokenization service for personal data.
+  # Official Helm chart: https://securitybunker.github.io/databunkerpro-setup
+  - name: databunkerpro
+    version: "0.1.0"
+    repository: https://securitybunker.github.io/databunkerpro-setup
+    condition: databunker.enabled

@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "databunkerpro.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: databunkerpro
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "databunkerpro.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: databunkerpro
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "databunkerpro.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "databunkerpro.fullname" . }}-env
+          env:
+            - name: DATABUNKER_WRAPPINGKEY_FILE
+              value: "/var/run/secrets/kubernetes.io/serviceaccount/wrapping-key/wrapping-key"
+            {{- if .Values.ssl.enabled }}
+            - name: DATABUNKER_SSL_CERT_FILE
+              value: "/databunker/certs/{{ .Values.ssl.certificate.certFile }}"
+            - name: DATABUNKER_SSL_KEY_FILE
+              value: "/databunker/certs/{{ .Values.ssl.certificate.keyFile }}"
+            {{- end }}
+            {{- if eq .Values.database.type "postgresql" }}
+            - name: PGSQL_USER_PASS_FILE
+              value: "/var/run/secrets/kubernetes.io/serviceaccount/postgres-password/password"
+            {{- else if eq .Values.database.type "mysql" }}
+            - name: MYSQL_USER_PASS_FILE
+              value: "/var/run/secrets/kubernetes.io/serviceaccount/mysql-password/password"
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_USER_PASS_FILE
+              value: "/var/run/secrets/kubernetes.io/serviceaccount/redis-password/password"
+            {{- end }}
+          ports:
+            {{- if .Values.ssl.enabled }}
+            - name: https
+              containerPort: {{ .Values.config.databunker.port }}
+              protocol: TCP
+            {{- else }}
+            - name: http
+              containerPort: {{ .Values.config.databunker.port }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.ssl.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: https
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: https
+              scheme: HTTPS
+          {{- else }}
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/databunker/databunker.yaml
+              subPath: databunker.yaml
+            - name: wrapping-key
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount/wrapping-key
+              readOnly: true
+            {{- if .Values.ssl.enabled }}
+            - name: ssl-certs
+              mountPath: /databunker/certs
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.database.type "mysql" }}
+            - name: mysql-password
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount/mysql-password
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.database.type "postgresql" }}
+            - name: postgres-password
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount/postgres-password
+              readOnly: true
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: redis-password
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount/redis-password
+              readOnly: true
+            {{- end }}
+          command: ["/databunker/bin/databunkerpro"]
+          args:
+            - "-db"
+            - "databunkerdb"
+            - "-conf"
+            - "/databunker/conf/databunker.yaml"
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "databunkerpro.fullname" . }}-config
+        - name: wrapping-key
+          secret:
+            secretName: {{ include "databunkerpro.fullname" . }}-wrapping-key
+            items:
+              - key: wrapping-key
+                path: wrapping-key
+        {{- if .Values.ssl.enabled }}
+        - name: ssl-certs
+          {{- if .Values.ssl.certificate.secretName }}
+          secret:
+            secretName: {{ .Values.ssl.certificate.secretName | default (printf "%s-tls" (include "databunkerpro.fullname" .)) }}
+            items:
+              - key: {{ .Values.ssl.certificate.certFile }}
+                path: {{ .Values.ssl.certificate.certFile }}
+              - key: {{ .Values.ssl.certificate.keyFile }}
+                path: {{ .Values.ssl.certificate.keyFile }}
+          {{- else if .Values.ssl.generateSelfSigned.enabled }}
+          secret:
+            secretName: {{ include "databunkerpro.fullname" . }}-tls
+            items:
+              - key: {{ .Values.ssl.certificate.certFile }}
+                path: {{ .Values.ssl.certificate.certFile }}
+              - key: {{ .Values.ssl.certificate.keyFile }}
+                path: {{ .Values.ssl.certificate.keyFile }}
+          {{- end }}
+        {{- end }}
+        {{- if eq .Values.database.type "mysql" }}
+        - name: mysql-password
+          secret:
+            secretName: {{ include "databunkerpro.dbSecretName" . }}
+            items:
+              - key: password
+                path: password
+        {{- end }}
+        {{- if eq .Values.database.type "postgresql" }}
+        - name: postgres-password
+          secret:
+            secretName: {{ include "databunkerpro.dbSecretName" . }}
+            items:
+              - key: password
+                path: password
+        {{- end }}
+        {{- if .Values.redis.enabled }}
+        - name: redis-password
+          secret:
+            secretName: {{ include "databunkerpro.fullname" . }}-redis
+            items:
+              - key: password
+                path: password
+        {{- end }} 

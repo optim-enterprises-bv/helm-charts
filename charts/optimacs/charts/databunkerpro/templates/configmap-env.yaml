@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "databunkerpro.fullname" . }}-env
+  labels:
+    {{- include "databunkerpro.labels" . | nindent 4 }}
+data:
+  {{- if .Values.database.external }}
+  {{- if eq .Values.database.type "postgresql" }}
+  PGSQL_HOST: {{ .Values.database.externalConfig.host | quote }}
+  PGSQL_PORT: {{ .Values.database.externalConfig.port | quote }}
+  PGSQL_DATABASE: {{ .Values.database.externalConfig.database | quote }}
+  PGSQL_USER_NAME: {{ .Values.database.externalConfig.user | quote }}
+  PGSQL_SSL_MODE: {{ .Values.database.externalConfig.sslMode | quote }}
+  {{- else if eq .Values.database.type "mysql" }}
+  MYSQL_HOST: {{ .Values.database.externalConfig.host | quote }}
+  MYSQL_PORT: {{ .Values.database.externalConfig.port | quote }}
+  MYSQL_DATABASE: {{ .Values.database.externalConfig.database | quote }}
+  MYSQL_USER_NAME: {{ .Values.database.externalConfig.user | quote }}
+  MYSQL_SSL_MODE: {{ .Values.database.externalConfig.sslMode | quote }}
+  {{- end }}
+  {{- else }}
+  {{- if eq .Values.database.type "postgresql" }}
+  PGSQL_HOST: "{{ include "databunkerpro.fullname" . }}-postgresql"
+  PGSQL_PORT: "5432"
+  PGSQL_DATABASE: {{ .Values.database.internal.postgresql.auth.database | quote }}
+  PGSQL_USER_NAME: {{ .Values.database.internal.postgresql.auth.username | quote }}
+  PGSQL_SSL_MODE: {{ .Values.database.internal.postgresql.sslMode | quote }}
+  {{- else if eq .Values.database.type "mysql" }}
+  MYSQL_HOST: "{{ include "databunkerpro.fullname" . }}-mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: {{ .Values.database.internal.mysql.auth.database | quote }}
+  MYSQL_USER_NAME: {{ .Values.database.internal.mysql.auth.username | quote }}
+  MYSQL_SSL_MODE: {{ .Values.database.internal.mysql.sslMode | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.redis.enabled }}
+  {{- if .Values.redis.external }}
+  REDIS_USER_NAME: {{ .Values.redis.externalConfig.username | quote }}
+  REDIS_HOST: {{ .Values.redis.externalConfig.host | quote }}
+  REDIS_PORT: {{ .Values.redis.externalConfig.port | quote }}
+  {{- else }}
+  REDIS_USER_NAME: {{ .Values.redis.internal.auth.username | quote }}
+  REDIS_HOST: "{{ include "databunkerpro.fullname" . }}-redis"
+  REDIS_PORT: "6379"
+  {{- end }}
+  {{- end }}

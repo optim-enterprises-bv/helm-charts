@@ -1,0 +1,14 @@
+apiVersion: v2
+appVersion: 1.0.0
+description: A Helm chart for DatabunkerPro - Privacy Vault for Personal Data
+keywords:
+- privacy
+- security
+- data-protection
+- gdpr
+- compliance
+maintainers:
+- name: DatabunkerPro Team
+name: databunkerpro
+type: application
+version: 0.1.0

@@ -14,5 +14,8 @@ dependencies:
 - name: redpanda
   repository: https://charts.redpanda.com
   version: 25.3.2
-digest: sha256:dd45b0b6b0c62165f954d8fc4d5fe993f0624dd8080810d4ab5fc27af6b16b42
-generated: "2026-03-06T09:41:01.360187294+07:00"
+- name: databunkerpro
+  repository: https://securitybunker.github.io/databunkerpro-setup
+  version: 0.1.0
+digest: sha256:d6b49bdc1c80012d1ac56e8f7bad69d74be2956b6a931ad0fd2cafc18b008e78
+generated: "2026-03-06T11:20:43.277922866+07:00"

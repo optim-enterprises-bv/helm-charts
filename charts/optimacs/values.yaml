@@ -102,9 +102,40 @@ securityContext:
   capabilities:
     drop: [ALL]
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ── DatabunkerPro subchart configuration ─────────────────────────────────────
+databunkerpro:
+  # Use existing MySQL instead of internal PostgreSQL
+  database:
+    external: true
+    type: mysql
+    externalConfig:
+      host: "optimacs-mysql"
+      port: 3306
+      database: "databunkerdb"
+      user: "acserver"
+      password: "changeme"
+      sslMode: "false"
+    # Disable internal databases
+    internal:
+      postgresql:
+        enabled: false
+      mysql:
+        enabled: false
+  
+  # Use existing Redis instead of internal Redis
+  redis:
+    enabled: true
+    external: true
+    externalConfig:
+      host: "optimacs-redis-master"
+      port: 6379
+    internal:
+      redis:
+        enabled: false
 imagePullSecrets: []
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
