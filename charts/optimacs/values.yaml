@@ -503,8 +503,14 @@ mysql:
         `username` varchar(32)  NOT NULL,
         `password` varchar(128) NOT NULL,
         `email`    varchar(128) NOT NULL DEFAULT '',
-        `role`     enum('full_admin','ap_admin','stats_viewer') NOT NULL DEFAULT 'ap_admin',
-        PRIMARY KEY (`id`)
+        `role`     enum('super_admin','full_admin','ap_admin','stats_viewer') NOT NULL DEFAULT 'ap_admin',
+        `tenant_id` int          NULL,
+        `active`   tinyint(1)   DEFAULT 1,
+        `created_at` datetime   DEFAULT NOW(),
+        `updated_at` datetime   DEFAULT NOW(),
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uk_username` (`username`),
+        KEY `idx_tenant` (`tenant_id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
       -- ── DB revision log ───────────────────────────────────────────────────
@@ -541,35 +547,63 @@ mysql:
 
       -- ── Firmware images ───────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS `firmware` (
-        `id`      int(11)      NOT NULL AUTO_INCREMENT,
-        `fw_name` varchar(512) NOT NULL,
-        `fw_size` varchar(64)  NOT NULL,
-        `fw_csum` varchar(64)  NOT NULL,
-        `fw_ver`  varchar(64)  NOT NULL,
-        PRIMARY KEY (`id`)
+        `id`           int(11)      NOT NULL AUTO_INCREMENT,
+        `fw_name`      varchar(512) NOT NULL,
+        `fw_size`      varchar(64)  NOT NULL,
+        `fw_csum`      varchar(64)  NOT NULL,
+        `fw_ver`       varchar(64)  NOT NULL,
+        `device_type`  varchar(64)  NULL,
+        `release_date` date         NULL,
+        `description`  text         NULL,
+        `active`       tinyint(1)   DEFAULT 1,
+        `tenant_id`    int          NULL,
+        `created_at`   datetime     DEFAULT NOW(),
+        PRIMARY KEY (`id`),
+        KEY `idx_firmware_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Firmware updates tracking ───────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `firmware_updates` (
+        `id`             int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id`    varchar(256) NOT NULL,
+        `from_version`   varchar(64)  NULL,
+        `to_version`     varchar(64)  NOT NULL,
+        `status`         enum('pending','downloading','downloaded','applying','completed','failed','cancelled') DEFAULT 'pending',
+        `error_message`  varchar(1024) NULL,
+        `started_at`     datetime     DEFAULT NOW(),
+        `completed_at`   datetime     NULL,
+        `tenant_id`      int          NULL,
+        PRIMARY KEY (`id`),
+        KEY `idx_endpoint` (`endpoint_id`),
+        KEY `idx_status`   (`status`),
+        KEY `idx_tenant`   (`tenant_id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
       -- ── Provisioned systems ───────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS `systems` (
-        `id`        int(11)      NOT NULL AUTO_INCREMENT,
-        `hostname`  varchar(256) NOT NULL,
-        `ip`        varchar(32)  NOT NULL,
-        `mac`       varchar(32)  NOT NULL,
-        `arch`      varchar(32)  NOT NULL,
-        `password`  varchar(64)  NOT NULL,
-        `version`   varchar(64)  DEFAULT NULL,
-        `fw_id`     int(11)      NOT NULL,
-        `ca_file`   text         NOT NULL,
-        `cert_file` text         NOT NULL,
-        `key_file`  text         NOT NULL,
-        `key_pass`  varchar(64)  DEFAULT NULL,
-        `last_seen` DATETIME     NOT NULL,
-        `active`    tinyint(1)   NOT NULL DEFAULT '1',
+        `id`               int(11)      NOT NULL AUTO_INCREMENT,
+        `hostname`         varchar(256) NOT NULL,
+        `ip`               varchar(32)  NOT NULL,
+        `mac`              varchar(32)  NOT NULL,
+        `arch`             varchar(32)  NOT NULL,
+        `password`         varchar(64)  NOT NULL,
+        `version`          varchar(64)  DEFAULT NULL,
+        `fw_id`            int(11)      NOT NULL,
+        `ca_file`          text         NOT NULL,
+        `cert_file`        text         NOT NULL,
+        `key_file`         text         NOT NULL,
+        `key_pass`         varchar(64)  DEFAULT NULL,
+        `last_seen`        DATETIME     NOT NULL,
+        `active`           tinyint(1)   NOT NULL DEFAULT '1',
+        `timezone`         varchar(16)  NULL,
+        `zonename`         varchar(64)  NULL,
+        `ttylogin`         tinyint(1)   NULL DEFAULT 0,
+        `log_size`         int          NULL,
+        `compat_version`   varchar(16)  NULL,
+        `tenant_id`        int          NULL,
         PRIMARY KEY (`id`),
-        -- Covering index for the most common lookup pattern:
-        --   WHERE mac = ? AND active = 1
-        -- Used by every USP DM query, heartbeat update, and MAC validation.
-        INDEX `idx_systems_mac_active` (`mac`, `active`)
+        INDEX `idx_systems_mac_active` (`mac`,`active`),
+        KEY `idx_tenant` (`tenant_id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
       -- ── Access networks ───────────────────────────────────────────────────
@@ -582,14 +616,18 @@ mysql:
 
       -- ── Wi-Fi devices ─────────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS `wifi_devices` (
-        `id`        int(11)     NOT NULL AUTO_INCREMENT,
-        `sys_id`    int(11)     NOT NULL,
-        `name`      varchar(32) NOT NULL,
-        `type`      varchar(32) NOT NULL,
-        `channel`   int(8)      NOT NULL,
-        `distance`  int(8)      DEFAULT NULL,
-        `antenna`   enum('left','right','both','verticle') DEFAULT NULL,
-        `diversity` int(8)      DEFAULT NULL,
+        `id`          int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`      int(11)     NOT NULL,
+        `name`        varchar(32) NOT NULL,
+        `type`        varchar(32) NOT NULL,
+        `channel`     int(8)      NOT NULL,
+        `distance`    int(8)      DEFAULT NULL,
+        `antenna`     enum('left','right','both','verticle') DEFAULT NULL,
+        `diversity`   int(8)      DEFAULT NULL,
+        `band`        varchar(8)  NULL,
+        `country`     varchar(8)  NULL,
+        `cell_density` int       NULL,
+        `path`        varchar(256) NULL,
         PRIMARY KEY (`id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -604,6 +642,10 @@ mysql:
         `netmask`      varchar(32) NOT NULL,
         `gateway`      varchar(32) NOT NULL,
         `dns`          varchar(32) NOT NULL,
+        `macaddr`      varchar(32) NULL,
+        `ip6prefix`    varchar(64) NULL,
+        `metric`       int         NULL,
+        `mtu`          int         NULL,
         `options`      varchar(256) DEFAULT '',
         `if_type`      enum('ethernet','wireless') NOT NULL DEFAULT 'ethernet',
         `if_type_id`   int(11)     DEFAULT NULL,
@@ -621,6 +663,9 @@ mysql:
         `mode`            varchar(64) NOT NULL,
         `encryption_type` enum('none','wep','wpa','wpa2','psk','psk2') NOT NULL DEFAULT 'wpa2',
         `encryption_key`  varchar(64) DEFAULT NULL,
+        `ocv`             int         NULL,
+        `device`          varchar(32) NULL,
+        `network`         varchar(32) NULL,
         `wds_connection`  varchar(64) DEFAULT NULL,
         `wds_automatic`   enum('enable','disable') DEFAULT 'disable',
         `wds_timeout`     int(8)      DEFAULT NULL,
@@ -649,10 +694,11 @@ mysql:
 
       -- ── DHCP host bindings ────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS `dhcp_hosts` (
-        `id`     int(11)     NOT NULL AUTO_INCREMENT,
-        `sys_id` int(11)     NOT NULL,
-        `mac`    varchar(32) NOT NULL,
-        `ip`     varchar(32) NOT NULL,
+        `id`       int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`   int(11)     NOT NULL,
+        `mac`      varchar(32) NOT NULL,
+        `ip`       varchar(32) NOT NULL,
+        `hostname` varchar(256) NULL,
         PRIMARY KEY (`id`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -798,6 +844,189 @@ mysql:
         `device_type`        enum('ethernet','wifi_device','wireless') NOT NULL,
         `device_capabilites` text        DEFAULT NULL,
         PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── USP Agents (TR-369) ─────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `usp_agents` (
+        `id`            int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id`   varchar(256) NOT NULL,
+        `sys_id`        int(11)      DEFAULT NULL,
+        `mac`           varchar(32)  DEFAULT NULL,
+        `ip`            varchar(64)  DEFAULT NULL,
+        `connected`     tinyint(1)   DEFAULT 0,
+        `last_seen`     datetime     DEFAULT NULL,
+        `boot_time`     datetime     DEFAULT NULL,
+        `agent_version` varchar(64)  DEFAULT NULL,
+        `manufacturer`  varchar(256) DEFAULT NULL,
+        `product_class` varchar(256) DEFAULT NULL,
+        `model_name`    varchar(256) DEFAULT NULL,
+        `serial_number` varchar(256) DEFAULT NULL,
+        `hardware_version` varchar(256) DEFAULT NULL,
+        `software_version` varchar(256) DEFAULT NULL,
+        `tenant_id`     int(11)      DEFAULT NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uk_endpoint_id` (`endpoint_id`),
+        KEY `idx_usp_agents_sys_id` (`sys_id`),
+        KEY `idx_usp_agents_mac` (`mac`),
+        KEY `idx_usp_agents_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── USP Command Queue ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `usp_commands` (
+        `id`             int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id`    varchar(256) NOT NULL,
+        `command_type` enum('SET','OPERATE','GET','ADD','DELETE') NOT NULL DEFAULT 'SET',
+        `command_data`   JSON         NOT NULL,
+        `status`         enum('pending','sent','acknowledged','error') NOT NULL DEFAULT 'pending',
+        `response_data`  JSON         NULL,
+        `error_message`  varchar(1024) NULL,
+        `created_at`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `sent_at`        datetime     NULL,
+        `acknowledged_at` datetime  NULL,
+        `tenant_id`      int(11)      NULL,
+        PRIMARY KEY (`id`),
+        KEY `idx_endpoint_status` (`endpoint_id`,`status`),
+        KEY `idx_created_at` (`created_at`),
+        KEY `idx_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── USP Parameter History (Audit Trail) ─────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `usp_parameter_history` (
+        `id`              int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id`     varchar(256) NOT NULL,
+        `parameter_path`  varchar(512) NOT NULL,
+        `old_value`       text         NULL,
+        `new_value`       text         NULL,
+        `change_type`     enum('SET','OPERATE') NOT NULL,
+        `changed_by`      varchar(64)  NULL,
+        `change_reason`   varchar(256) NULL,
+        `created_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `tenant_id`       int(11)      NULL,
+        PRIMARY KEY (`id`),
+        KEY `idx_endpoint_path` (`endpoint_id`,`parameter_path`),
+        KEY `idx_created_at` (`created_at`),
+        KEY `idx_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── USP Events ──────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `usp_events` (
+        `id`          int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id` varchar(256) NOT NULL,
+        `event_type`  varchar(64)  NOT NULL,
+        `event_data`  JSON         NULL,
+        `created_at`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `tenant_id`   int(11)      NULL,
+        PRIMARY KEY (`id`),
+        KEY `idx_endpoint_id` (`endpoint_id`),
+        KEY `idx_event_type` (`event_type`),
+        KEY `idx_created_at` (`created_at`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── USP Subscriptions ───────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `usp_subscriptions` (
+        `id`              int(11)      NOT NULL AUTO_INCREMENT,
+        `endpoint_id`     varchar(256) NOT NULL,
+        `subscription_id` varchar(64) NOT NULL,
+        `notif_type`      varchar(32)  NOT NULL,
+        `reference_list`  text         NULL,
+        `criteria`        text         NULL,
+        `created_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `tenant_id`       int(11)      NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uk_endpoint_sub_id` (`endpoint_id`,`subscription_id`),
+        KEY `idx_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── RBAC Multi-tenancy ──────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `tenants` (
+        `id`          int(11)      NOT NULL AUTO_INCREMENT,
+        `name`        varchar(256) NOT NULL,
+        `description` text         NULL,
+        `active`      tinyint(1)   DEFAULT 1,
+        `created_at`  datetime     DEFAULT NOW(),
+        `updated_at`  datetime     DEFAULT NOW(),
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── DHCP Pools ─────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `dhcp_pools` (
+        `id`         int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`     int(11)     NOT NULL,
+        `iface_name` varchar(32) NOT NULL,
+        `start`      int(11)     NOT NULL DEFAULT 100,
+        `limit`      int(11)     NOT NULL DEFAULT 150,
+        `leasetime`  varchar(16) NOT NULL DEFAULT '12h',
+        `ignore`     tinyint(1)  NOT NULL DEFAULT 0,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `sys_iface` (`sys_id`,`iface_name`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── LED Configs ──────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `led_configs` (
+        `id`     int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id` int(11)     NOT NULL,
+        `name`   varchar(32) NOT NULL,
+        `sysfs`  varchar(128) NOT NULL,
+        `trigger` varchar(32) NOT NULL,
+        `mode`   varchar(32) NULL,
+        `dev`    varchar(32) NULL,
+        PRIMARY KEY (`id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── System Services ─────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `system_services` (
+        `id`            int(11)     NOT NULL AUTO_INCREMENT,
+        `sys_id`        int(11)     NOT NULL,
+        `service_name`  varchar(32) NOT NULL,
+        `enabled`       tinyint(1)  NOT NULL DEFAULT 1,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `sys_service` (`sys_id`,`service_name`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Billing: Subscriptions ──────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `billing_subscriptions` (
+        `id`                int(11)       NOT NULL AUTO_INCREMENT,
+        `tenant_id`         int(11)       NOT NULL,
+        `plan`              varchar(32)   NOT NULL,
+        `status`            enum('active','cancelled','past_due','unpaid') DEFAULT 'active',
+        `current_period_start` datetime   NOT NULL,
+        `current_period_end`   datetime   NOT NULL,
+        `cancel_at_period_end` tinyint(1) DEFAULT 0,
+        `created_at`        datetime      DEFAULT NOW(),
+        `updated_at`        datetime      DEFAULT NOW(),
+        PRIMARY KEY (`id`),
+        KEY `idx_tenant` (`tenant_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── Billing: Invoices ──────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `billing_invoices` (
+        `id`              int(11)       NOT NULL AUTO_INCREMENT,
+        `tenant_id`       int(11)       NOT NULL,
+        `subscription_id` int(11)       DEFAULT NULL,
+        `amount`          decimal(10,2) NOT NULL,
+        `currency`        varchar(3)    NOT NULL DEFAULT 'USD',
+        `status`          enum('draft','open','paid','uncollectible','void') DEFAULT 'draft',
+        `description`     text          NULL,
+        `due_date`        datetime      NULL,
+        `paid_at`         datetime      NULL,
+        `created_at`      datetime      DEFAULT NOW(),
+        PRIMARY KEY (`id`),
+        KEY `idx_tenant` (`tenant_id`),
+        KEY `idx_subscription` (`subscription_id`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+      -- ── GDPR Removal Requests ──────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS `gdpr_removal_requests` (
+        `id`           int(11)      NOT NULL AUTO_INCREMENT,
+        `user_id`      int(11)      NOT NULL,
+        `email`        varchar(256) NOT NULL,
+        `status`       enum('pending','in_progress','completed','rejected') DEFAULT 'pending',
+        `requested_at` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `completed_at` datetime     NULL,
+        `verification_token` varchar(256) NULL,
+        PRIMARY KEY (`id`),
+        KEY `idx_user` (`user_id`),
+        KEY `idx_status` (`status`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 # ── Redpanda (Kafka-compatible event broker) ──────────────────────────────────
