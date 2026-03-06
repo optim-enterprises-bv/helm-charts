@@ -4,7 +4,7 @@
 # ── ac-server ─────────────────────────────────────────────────────────────────
 
 image:
-  repository: ghcr.io/optim-enterprises-bv/ac-server
+  repository: gitea.optimcloud.com/optim-enterprises-bv/ac-server
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -89,10 +89,13 @@ resources:
     memory: 256Mi
 
 podAnnotations: {}
-podSecurityContext: {}
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
 
 securityContext:
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: false
   runAsNonRoot: true
   runAsUser: 1000
   allowPrivilegeEscalation: false
@@ -110,7 +113,7 @@ ui:
   enabled: true
 
   image:
-    repository: ghcr.io/optim-enterprises-bv/optimacs-ui
+    repository: gitea.optimcloud.com/optim-enterprises-bv/optimacs-ui
     tag: "latest"
     pullPolicy: IfNotPresent
 
@@ -439,7 +442,13 @@ mysql:
 
   # "replication" = primary StatefulSet + secondary StatefulSet (HA).
   # "standalone"  = single node (dev / resource-constrained environments).
-  architecture: replication
+  architecture: standalone
+
+  # Using MariaDB 11 (matches docker-compose.yml)
+  image:
+    registry: docker.io
+    repository: library/mariadb
+    tag: "11"
 
   auth:
     # Root password for administrative operations.  Required.

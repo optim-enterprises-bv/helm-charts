@@ -87,13 +87,13 @@ MySQL helpers
 
 {{/*
 Write endpoint hostname.
-When the embedded MySQL sub-chart is enabled this resolves to the bitnami/mysql
-primary service (<release>-mysql-primary).  For an external DB the operator
+When the embedded MariaDB sub-chart is enabled this resolves to the bitnami/mariadb
+service (<release>-mariadb).  For an external DB the operator
 must set config.dbHost to their host.
 */}}
 {{- define "optimacs.mysql.host" -}}
 {{- if .Values.mysql.enabled -}}
-{{- printf "%s-mysql-primary" .Release.Name }}
+{{- printf "%s-mariadb" .Release.Name }}
 {{- else -}}
 {{- .Values.config.dbHost }}
 {{- end }}

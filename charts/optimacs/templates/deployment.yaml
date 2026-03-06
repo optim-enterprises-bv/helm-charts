@@ -29,9 +29,23 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      # Write the config to /tmp (the only writable path when
-      # readOnlyRootFilesystem is true) before the main container starts.
+      # Fix permissions on persistent volumes before main container starts
       initContainers:
+        - name: fix-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chown -R 1000:1000 /var/ac-server/peers /var/ac-server/firmware /var/ac-server/images || true; chmod -R 755 /var/ac-server/peers /var/ac-server/firmware /var/ac-server/images || true"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: client-dir
+              mountPath: /var/ac-server/peers
+            - name: fw-dir
+              mountPath: /var/ac-server/firmware
+            - name: img-dir
+              mountPath: /var/ac-server/images
+
+        # Write the config to /tmp (the only writable path when
+        # readOnlyRootFilesystem is true) before the main container starts.
         - name: init-config
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -51,7 +65,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          command: ["ac-server", "-f", "/tmp/ac_server.conf"]
+          command: ["sh", "-c", "mkdir -p /tmp/ac-server && ac-server -f /tmp/ac_server.conf -p /tmp/ac-server.pid"]
           ports:
             - name: acp
               containerPort: {{ .Values.config.serverPort }}

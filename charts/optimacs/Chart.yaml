@@ -26,8 +26,8 @@ maintainers:
 dependencies:
   # Bitnami MySQL — deployed as a primary/replica cluster.
   # Run `helm dependency update charts/optimacs` to fetch chart archives.
-  - name: mysql
-    version: "11.1.10"
+  - name: mariadb
+    version: "25.0.1"
     repository: https://charts.bitnami.com/bitnami
     condition: mysql.enabled
 

@@ -1,7 +1,7 @@
 dependencies:
-- name: mysql
+- name: mariadb
   repository: https://charts.bitnami.com/bitnami
-  version: 11.1.10
+  version: 25.0.1
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 25.3.2
@@ -11,5 +11,8 @@ dependencies:
 - name: step-certificates
   repository: https://smallstep.github.io/helm-charts
   version: 1.29.0
-digest: sha256:ec4625b8cd46b4d9acfa6c6d065910bdef7fc662f19bcbe5fd7b3e6f7719572f
-generated: "2026-02-27T16:42:05.899694+07:00"
+- name: redpanda
+  repository: https://charts.redpanda.com
+  version: 25.3.2
+digest: sha256:dd45b0b6b0c62165f954d8fc4d5fe993f0624dd8080810d4ab5fc27af6b16b42
+generated: "2026-03-06T09:41:01.360187294+07:00"
