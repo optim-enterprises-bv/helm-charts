@@ -39,9 +39,9 @@ helm upgrade --install optimacs $CHART_PATH \
   --set ui.image.tag=latest \
   --set db.password=optimacs123 \
   --set mysql.auth.rootPassword=root12345 \
-  --set mariadb.image.tag=latest \
-  --set mariadb.image.registry=docker.io \
-  --set mariadb.image.repository=bitnami/mariadb \
+  --set mysql.auth.database=laravel \
+  --set mysql.auth.username=acserver \
+  --set mysql.auth.password=optimacs123 \
   --set ui.secretKey=$UI_SECRET_KEY \
   --set mysql.enabled=true \
   --set mysql.architecture=standalone \

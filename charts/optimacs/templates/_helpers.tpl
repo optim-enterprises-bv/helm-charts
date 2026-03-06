@@ -88,12 +88,12 @@ MySQL helpers
 {{/*
 Write endpoint hostname.
 When the embedded MariaDB sub-chart is enabled this resolves to the bitnami/mariadb
-service (<release>-mariadb).  For an external DB the operator
+service (<release>-mysql).  For an external DB the operator
 must set config.dbHost to their host.
 */}}
 {{- define "optimacs.mysql.host" -}}
 {{- if .Values.mysql.enabled -}}
-{{- printf "%s-mariadb" .Release.Name }}
+{{- printf "%s-mysql" .Release.Name }}
 {{- else -}}
 {{- .Values.config.dbHost }}
 {{- end }}

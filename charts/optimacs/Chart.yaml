@@ -30,6 +30,7 @@ dependencies:
     version: "25.0.1"
     repository: https://charts.bitnami.com/bitnami
     condition: mysql.enabled
+    alias: mysql
 
   # Bitnami Redis — optional config-proto cache and rate-limit store.
   # Set redis.enabled=true to deploy; or point redis.url at an external instance.
