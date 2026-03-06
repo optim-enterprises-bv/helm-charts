@@ -84,7 +84,7 @@ spec:
           # Liveness: the process must still be running
           livenessProbe:
             tcpSocket:
-              port: acp
+              port: usp-ws
             initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 6
@@ -92,7 +92,7 @@ spec:
           # Readiness: the port must be accepting connections
           readinessProbe:
             tcpSocket:
-              port: acp
+              port: usp-ws
             initialDelaySeconds: 30
             periodSeconds: 10
 
