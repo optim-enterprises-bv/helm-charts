@@ -77,3 +77,17 @@ dependencies:
     version: "0.1.0"
     repository: https://securitybunker.github.io/databunkerpro-setup
     condition: databunker.enabled
+
+  # InfluxDB v2 — time-series database for device telemetry.
+  # Set influxdb.enabled=true to deploy an in-cluster InfluxDB instance.
+  - name: influxdb2
+    version: ">=2.0.0"
+    repository: https://helm.influxdata.com
+    condition: influxdb.enabled
+
+  # Grafana — dashboards and alerting on telemetry data.
+  # Set grafana.enabled=true to deploy an in-cluster Grafana instance.
+  - name: grafana
+    version: ">=6.0.0"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled

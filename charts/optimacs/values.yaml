@@ -1112,6 +1112,18 @@ victoriametrics:
   # Example: http://victoria-metrics.monitoring.svc:8428/api/v1/write
   remoteWriteUrl: ""
 
+# ── InfluxDB v2 ────────────────────────────────────────────────────────────────
+# Time-series database for device telemetry (alternative to VictoriaMetrics).
+# Set influxdb.enabled=true to deploy an in-cluster InfluxDB instance.
+influxdb:
+  enabled: false
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+# Dashboards and alerting on telemetry data.
+# Set grafana.enabled=true to deploy an in-cluster Grafana instance.
+grafana:
+  enabled: false
+
   # Optional HTTP Basic Auth for the remote-write endpoint.
   basicAuth:
     username: ""

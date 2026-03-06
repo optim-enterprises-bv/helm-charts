@@ -17,5 +17,11 @@ dependencies:
 - name: databunkerpro
   repository: https://securitybunker.github.io/databunkerpro-setup
   version: 0.1.0
-digest: sha256:d6b49bdc1c80012d1ac56e8f7bad69d74be2956b6a931ad0fd2cafc18b008e78
-generated: "2026-03-06T11:20:43.277922866+07:00"
+- name: influxdb2
+  repository: https://helm.influxdata.com
+  version: 2.1.2
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 10.5.15
+digest: sha256:4d35fc6dee3d89d2b869e1918f1e286685efb319a208a447229c80982dd1045b
+generated: "2026-03-06T12:36:27.621434432+07:00"
