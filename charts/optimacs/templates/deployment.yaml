@@ -85,15 +85,15 @@ spec:
           livenessProbe:
             tcpSocket:
               port: acp
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 15
-            failureThreshold: 3
+            failureThreshold: 6
 
           # Readiness: the port must be accepting connections
           readinessProbe:
             tcpSocket:
               port: acp
-            initialDelaySeconds: 3
+            initialDelaySeconds: 30
             periodSeconds: 10
 
           {{- with .Values.resources }}
